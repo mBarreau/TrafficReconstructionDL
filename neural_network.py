@@ -39,7 +39,7 @@ class NeuralNetwork():
         self.Vf = Vf
         self.VfVar = tf.Variable(Vf, dtype=tf.float32, trainable=False)
         self.gamma = np.sqrt(gamma)
-        self.gamma_var = tf.Variable(tf.truncated_normal([1,1], mean=self.gamma, stddev=0.01, dtype=tf.float32), dtype=tf.float32, trainable=True)[0,0]
+        self.gamma_var = tf.Variable(tf.truncated_normal([1,1], mean=self.gamma, stddev=0.01, dtype=tf.float32), dtype=tf.float32, trainable=True)
 
         self.act_density = tf.nn.tanh
         self.weights_density, self.biases_density = self.initialize_neural_network(layers_density, init, act="tanh")
