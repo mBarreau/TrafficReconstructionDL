@@ -201,8 +201,8 @@ class BoundaryConditions:
             # zin = np.ones((Nt, 1))*0.9
             zin = np.ones((self.randomT[0,0], 1))*self.randomValues[0,0]
             for i in range(self.randomT.shape[1]-1):
-                #zin = np.vstack((zin, np.ones((self.randomT[0,i+1] - self.randomT[0,i], 1))*self.randomValues[0,i+1]))
-                zin = np.vstack((zin, np.ones((self.randomT[0,i+1] - self.randomT[0,i], 1))*(i%2)))
+                zin = np.vstack((zin, np.ones((self.randomT[0,i+1] - self.randomT[0,i], 1))*self.randomValues[0,i+1]))
+                #zin = np.vstack((zin, np.ones((self.randomT[0,i+1] - self.randomT[0,i], 1))*(i%2)))
             
         return zin
     

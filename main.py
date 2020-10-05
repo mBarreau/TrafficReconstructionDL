@@ -6,9 +6,9 @@ Created on Mon Sep 14 15:17:25 2020
 """
 
 import numpy as np
-np.random.seed(1234)
+np.random.seed(12345)
 import godunov as g
-import reconstruction_network_unit as rn
+import reconstruction_neural_network as rn
 import matplotlib.pyplot as plt
 from pyDOE import lhs
 
@@ -78,7 +78,6 @@ rhoBar = 0.2
 Tmax = 100
 p = 1/15
 L = 5000
-Nexp = 0
 rhoMax = 120
 rhoSigma = 0.6
 
@@ -110,21 +109,14 @@ xiArrayPlot = (simu_godunov.pv.xiArray[:, it][[-1, 0], :]*Nx/L).astype(np.int)
 init1, init2 = xiArrayPlot[0,0], xiArrayPlot[-1,0]
 N_init = init2 - init1
 
-x_train, t_train, u_train = get_probe_vehicle_data(selectedPacket=0.33,totalPacket=-1)
+x_train, t_train, u_train = get_probe_vehicle_data(selectedPacket=-1,totalPacket=-1)
 # x_train, t_train, u_train = get_probe_vehicle_data(L=Ltotal, Tmax=Tmax)
 
-num_hidden_layers = 8
-num_nodes_per_layer = 30
-layers = [2]
-for _ in range(num_hidden_layers):
-    layers.append(num_nodes_per_layer)
-layers.append(1)
+trained_neural_network = rn.ReconstructionNeuralNetwork(x_train, t_train, u_train, 
+                                                    L, Tmax, gamma=gamma, Vf=Vf, 
+                                                    N_f=7500, N_g=150)
 
-# confidence_neural_network = rn.ConfidenceNeuralNetwork(x_train, t_train, u_train, L, Tmax, Nexp=Nexp, units=50,
-#                                                         layers=(2,5,5,1), gamma=gamma, Vf=Vf, N_f=10000, N_g=100) # Several units
-confidence_neural_network = rn.ConfidenceNeuralNetwork(x_train, t_train, u_train, L, Tmax, Nexp=Nexp, units=1,
-                                                        layers=layers, gamma=gamma, Vf=Vf, N_f=7500, N_g=150) # 1 unit
-[_, figError] = confidence_neural_network.plot(axisPlot, u)
+[_, figError] = trained_neural_network.plot(axisPlot, u)
 simu_godunov.pv.plot(axisPlot[1])
 plt.show()
 figError.savefig('error.eps', bbox_inches='tight')
