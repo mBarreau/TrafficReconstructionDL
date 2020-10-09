@@ -290,34 +290,27 @@ class SimuGodunov:
     def getAxisPlot(self):
         return (self.x, self.t)
         
-    def plot(self, NxPlot=-1, NtPlot=-1):
+    def plot(self):
         
-        z = self.z
+        z = self.z           
+        self.t = np.linspace(0, self.sim.Tmax, self.sim.Nt)
+        self.x = np.linspace(0, self.sim.L, self.sim.Nx)
         
-        if NxPlot < 0:
-            NxPlot = min(500, self.sim.Nx)
-        if NtPlot < 0:
-            NtPlot = min(250, self.sim.Nt)
+        # if NxPlot < 0:
+        #     NxPlot = min(1000, self.sim.Nx)
+        # if NtPlot < 0:
+        #     NtPlot = min(500, self.sim.Nt)
             
-        self.t = np.linspace(0, self.sim.Tmax, NtPlot)
-        self.x = np.linspace(0, self.sim.L, NxPlot)
-        it = np.round(np.arange(0, self.sim.Nt, self.sim.Nt/NtPlot)).astype(int)
-        ix = np.round(np.arange(0, self.sim.Nx, self.sim.Nx/NxPlot)).astype(int)
-        zPlot = z[ix, :]
-        zPlot = zPlot[:, it]
-            
-        # x_pv, t_pv, _ = self.pv.getMeasurements(z)
-        # lb = np.array([np.amin(x_pv), np.amin(t_pv)])
-        # ub = np.array([np.amax(x_pv), np.amax(t_pv)])
-        
-        # t = 2*(self.t-lb[1])/(ub[1] - lb[1]) -1
-        # x = 2*(self.x-lb[0])/(ub[0] - lb[0]) -1
-        t = self.t
-        x = self.x
+        # self.t = np.linspace(0, self.sim.Tmax, NtPlot)
+        # self.x = np.linspace(0, self.sim.L, NxPlot)
+        # it = np.round(np.arange(0, self.sim.Nt, self.sim.Nt/NtPlot)).astype(int)
+        # ix = np.round(np.arange(0, self.sim.Nx, self.sim.Nx/NxPlot)).astype(int)
+        # zPlot = z[ix, :]
+        # zPlot = zPlot[:, it]
         
         fig = plt.figure(figsize=(7.5, 5))
-        X, Y = np.meshgrid(t, x)
-        plt.pcolor(X, Y, zPlot, shading='auto', vmin=0.0, vmax=1.0, rasterized=True)
+        X, Y = np.meshgrid(self.t, self.x)
+        plt.pcolor(X, Y, z, shading='auto', vmin=0.0, vmax=1.0, rasterized=True)
         # plt.pcolor(X, Y, 2*zPlot-1, shading='auto', vmin=-1.0, vmax=1.0, rasterized=True)
         plt.xlabel(r'Time [s]')
         plt.ylabel(r'Position [m]')
