@@ -23,9 +23,6 @@ def get_probe_vehicle_data(L=-1, Tmax=-1, selectedPacket=-1, totalPacket=-1):
         Nxi = 1
     else:
         x_true, t, u_true = simu_godunov.getMeasurements()
-        # x_p = np.random.rand(100,1)*L
-        # t_p = np.zeros(100,1)
-        # u_p = simu_godunov.getDatas(x_p, t_p)
         Nt = t.shape[0]
         Nxi = x_true.shape[-1]
         N = Nt * Nxi
@@ -72,18 +69,18 @@ def get_probe_vehicle_data(L=-1, Tmax=-1, selectedPacket=-1, totalPacket=-1):
     return x, t_selected, u_meas
 
 # General parameters
-Vf = 25
-gamma = 0
-rhoBar = 0.2
-Tmax = 100
-p = 1/15
-L = 5000
-rhoMax = 120
-rhoSigma = 0.6
+Vf = 25 # Maximum car speed in km.h^-1
+gamma = 0 # dissipativity coefficient (0 by default, discrepencies may occur if very small)
+Tmax = 100 # simulation time
+p = 1/15 # Probability that a car is a PV
+L = 5000 # Length of the road
+rhoBar = 0.2 # Average density of cars on the road
+rhoMax = 120 # Number of vehicles per kilometer
+rhoSigma = 0.6 # 
 
 Vbar = Vf*(1-rhoBar) # Average speed
 Lplus = Tmax*(Vbar+0.1*Vf)/1.1 # Additionnal length
-Ltotal = L+Lplus
+Ltotal = L + Lplus
 
 Ncar = rhoBar*rhoMax*Ltotal/1000 # Number of cars
 Npv = int(Ncar*p) # Number of PV
@@ -95,25 +92,15 @@ xiT = np.array([0]*Npv)
 
 simu_godunov = g.SimuGodunov(Vf, gamma, xiPos, xiT, L=Ltotal, Tmax=Tmax,
                              zMin=0, zMax=1, Nx=1000, rhoBar=rhoBar, rhoSigma=rhoSigma)
-
-Nx, Nt, Nxi = simu_godunov.sim.Nx, simu_godunov.sim.Nt, simu_godunov.pv.Nxi
-L, Tmax = simu_godunov.sim.L, simu_godunov.sim.Tmax
-it = np.arange(Nt)
-
 u = simu_godunov.simulation()
-
 simu_godunov.plot()
 axisPlot = simu_godunov.getAxisPlot()
-
-xiArrayPlot = (simu_godunov.pv.xiArray[:, it][[-1, 0], :]*Nx/L).astype(np.int)
-init1, init2 = xiArrayPlot[0,0], xiArrayPlot[-1,0]
-N_init = init2 - init1
 
 x_train, t_train, u_train = get_probe_vehicle_data(selectedPacket=-1,totalPacket=-1)
 # x_train, t_train, u_train = get_probe_vehicle_data(L=Ltotal, Tmax=Tmax)
 
 trained_neural_network = rn.ReconstructionNeuralNetwork(x_train, t_train, u_train, 
-                                                    L, Tmax, gamma=gamma, Vf=Vf, 
+                                                    Ltotal, Tmax, gamma=gamma, Vf=Vf, 
                                                     N_f=7500, N_g=150)
 
 [_, figError] = trained_neural_network.plot(axisPlot, u)

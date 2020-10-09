@@ -6,17 +6,11 @@ Created on Mon Sep  7 10:15:37 2020
 """
 
 import numpy as np
-
 #import matplotlib
 #matplotlib.use('TKAgg')
 import matplotlib.pyplot as plt
-
 from time import time
-
-from scipy.stats import t as student
-
 from pyDOE import lhs
-
 from neural_network import NeuralNetwork
 
 # np.random.seed(12345)
@@ -36,7 +30,7 @@ class ReconstructionNeuralNetwork():
         self.Nxi = x.shape[1]
         
         num_hidden_layers = int(Tmax*8/100)
-        num_nodes_per_layer = int(20*L/5000)
+        num_nodes_per_layer = int(20*L/7000)
         layers = [2]
         for _ in range(num_hidden_layers):
             layers.append(num_nodes_per_layer)
@@ -113,7 +107,7 @@ class ReconstructionNeuralNetwork():
 
         figReconstruction = plt.figure(figsize=(7.5, 5))
         X, Y = np.meshgrid(t, x)
-        plt.pcolor(X, Y, U_prediction, vmin=0.0, vmax=1.0, shading='auto')
+        plt.pcolor(X, Y, U_prediction, vmin=0.0, vmax=1.0, shading='auto', rasterized=True)
         plt.plot(t, X_prediction, color="orange")
         plt.xlabel(r'Time [s]')
         plt.ylabel(r'Position [m]')
@@ -122,16 +116,13 @@ class ReconstructionNeuralNetwork():
         plt.colorbar()
         plt.tight_layout()
         # plt.title('Reconstruction')
-        self.t_train = (np.tile(self.neural_network.t, (1,self.Nxi)).reshape((-1,1)) + 1)*(self.ub[1] - self.lb[1])/2 + self.lb[1]
-        self.x_train = (self.neural_network.x.reshape((-1,1)) + 1)*(self.ub[0] - self.lb[0])/2 + self.lb[0]
-        plt.scatter(self.t_train, self.x_train, s=0.5, c="red") 
         plt.show()
         figReconstruction.savefig('reconstruction.eps', bbox_inches='tight')
         
         
         figError = plt.figure(figsize=(7.5, 5))
         X, Y = np.meshgrid(t, x)
-        plt.pcolor(X, Y, np.abs(U_prediction-u), vmin=0.0, vmax=1.0, shading='auto')
+        plt.pcolor(X, Y, np.abs(U_prediction-u), vmin=0.0, vmax=1.0, shading='auto', rasterized=True)
         plt.plot(t, X_prediction, color="orange")
         plt.xlabel(r'Time [s]')
         plt.ylabel(r'Position [m]')

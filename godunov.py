@@ -93,7 +93,7 @@ class ProbeVehicles:
         x = xiArrayPlot
         
         for i in range(self.Nxi):
-            plt.scatter(t, x[i, :], s=1, color='red')
+            plt.plot(t, x[i, :], color='red')
         
 
 class BoundaryConditions:
@@ -174,8 +174,8 @@ class BoundaryConditions:
             # zin = np.ones((Nt, 1))*0.45
             zin = np.ones((self.randomT[1,0], 1))*self.randomValues[1,0]
             for i in range(self.randomT.shape[1]-1):
-                #zin = np.vstack((zin, np.ones((self.randomT[0,i+1] - self.randomT[0,i], 1))*self.randomValues[0,i+1]))
-                zin = np.vstack((zin, np.ones((self.randomT[1,i+1] - self.randomT[1,i], 1))*(i%2)))
+                zin = np.vstack((zin, np.ones((self.randomT[0,i+1] - self.randomT[0,i], 1))*self.randomValues[0,i+1]))
+                # zin = np.vstack((zin, np.ones((self.randomT[1,i+1] - self.randomT[1,i], 1))*(i%2)))
             
         return zin
     
@@ -202,7 +202,7 @@ class BoundaryConditions:
             zin = np.ones((self.randomT[0,0], 1))*self.randomValues[0,0]
             for i in range(self.randomT.shape[1]-1):
                 zin = np.vstack((zin, np.ones((self.randomT[0,i+1] - self.randomT[0,i], 1))*self.randomValues[0,i+1]))
-                #zin = np.vstack((zin, np.ones((self.randomT[0,i+1] - self.randomT[0,i], 1))*(i%2)))
+                # zin = np.vstack((zin, np.ones((self.randomT[0,i+1] - self.randomT[0,i], 1))*(i%2)))
             
         return zin
     
@@ -265,7 +265,7 @@ class SimuGodunov:
     
         for n in range(1, Nt): # Apply numerical estimation
                 
-            z[0, n] = min(max(self.zBottom[n], self.zMin), self.zMax)
+            z[0, n] = min(max(self.zTop[n], self.zMin), self.zMax)
             
             for i in range(1, Nx-1): # Real traffic state
         
@@ -280,7 +280,7 @@ class SimuGodunov:
                 
                 z[i, n] = min(max(z[i, n], self.zMin), self.zMax)
         
-            z[-1, n] = min(max(self.zTop[n], self.zMin), self.zMax)
+            z[-1, n] = min(max(self.zBottom[n], self.zMin), self.zMax)
             
             self.pv.update(z[:, n], n)
         
@@ -289,18 +289,15 @@ class SimuGodunov:
     
     def getAxisPlot(self):
         return (self.x, self.t)
-    
-    def plotPoints(self, x, t):
-        plt.scatter(t, x, s=1, color='red')
         
     def plot(self, NxPlot=-1, NtPlot=-1):
         
         z = self.z
         
         if NxPlot < 0:
-            NxPlot = min(4000, self.sim.Nx)
+            NxPlot = min(500, self.sim.Nx)
         if NtPlot < 0:
-            NtPlot = min(700, self.sim.Nt)
+            NtPlot = min(250, self.sim.Nt)
             
         self.t = np.linspace(0, self.sim.Tmax, NtPlot)
         self.x = np.linspace(0, self.sim.L, NxPlot)
@@ -320,8 +317,8 @@ class SimuGodunov:
         
         fig = plt.figure(figsize=(7.5, 5))
         X, Y = np.meshgrid(t, x)
-        plt.pcolor(X, Y, zPlot, shading='auto', vmin=0.0, vmax=1.0)
-        # plt.pcolor(X, Y, 2*zPlot-1, shading='auto', vmin=-1.0, vmax=1.0)
+        plt.pcolor(X, Y, zPlot, shading='auto', vmin=0.0, vmax=1.0, rasterized=True)
+        # plt.pcolor(X, Y, 2*zPlot-1, shading='auto', vmin=-1.0, vmax=1.0, rasterized=True)
         plt.xlabel(r'Time [s]')
         plt.ylabel(r'Position [m]')
         #plt.xlim(0, self.sim.Tmax)

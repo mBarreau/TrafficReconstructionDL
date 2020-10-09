@@ -39,16 +39,22 @@ class NeuralNetwork():
         self.Vf = Vf
         self.VfVar = tf.Variable(Vf, dtype=tf.float32, trainable=False)
         self.gamma = np.sqrt(gamma)
-        self.gamma_var = tf.Variable(tf.truncated_normal([1,1], mean=self.gamma, stddev=0.01, dtype=tf.float32), dtype=tf.float32, trainable=True)
+        self.gamma_var = tf.Variable(tf.truncated_normal([1,1], mean=self.gamma, 
+                                                         stddev=0.01, dtype=tf.float32), 
+                                     dtype=tf.float32, trainable=True)
 
-        self.act_density = tf.nn.tanh
         self.weights_density, self.biases_density = self.initialize_neural_network(layers_density, init, act="tanh")
         list_var_density = self.weights_density + self.biases_density
+        # self.weights_density_relu, self.biases_density_relu = self.initialize_neural_network(layers_density, init, act="relu")
+        # list_var_density = self.weights_density + self.weights_density_relu \
+        #     + self.biases_density + self.biases_density_relu
         list_var_density.append(self.gamma_var)
         
         self.weights_trajectories, self.biases_trajectories = self.initialize_neural_network(layers_trajectories, initWeights=initWeights, initBias=initBias, act="tanh")
-        self.weights_trajectoriesRelu, self.biases_trajectoriesRelu = self.initialize_neural_network(layers_trajectories, initWeights=initWeights, initBias=initBias, act="relu")
+        self.weights_trajectories_relu, self.biases_trajectories_relu = self.initialize_neural_network(layers_trajectories, initWeights=initWeights, initBias=initBias, act="relu")
         # listVarTrajectories = self.weights_trajectories + self.biases_trajectories
+        self.weight_tanh = tf.Variable(1, dtype=tf.float32, trainable=True)
+        self.weight_relu = tf.Variable(0.01, dtype=tf.float32, trainable=True)
         
         self.sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True,
                                                      log_device_placement=True))
@@ -80,37 +86,26 @@ class NeuralNetwork():
         self.MSEtrajectories = tf.reduce_sum(tf.square(self.x_tf - self.x_pred))/self.Nxi
         self.MSEg = tf.reduce_mean(tf.square(self.g_pred))
         
-        self.loss_trajectories = 1*(self.MSEtrajectories + 0.5*self.MSEg)
-        # self.loss = self.MSEu + self.MSEtrajectories + 0.5*(self.MSEf + 1*self.MSEg + 0.1*tf.square(self.gamma_var))
+        self.loss_trajectories = self.MSEtrajectories + 0.5*self.MSEg
         self.loss = self.MSEu + 0.1*self.MSEf + 0.5*self.loss_trajectories
-        self.lossPrecise = self.MSEu + self.MSEf + self.loss_trajectories + 0.1*tf.square(self.gamma_var)
+        self.loss_precise = self.MSEu + self.MSEf + self.loss_trajectories + 0.1*tf.square(self.gamma_var)
         
-        self.optimizer_trajectories = tf.contrib.opt.ScipyOptimizerInterface(self.loss_trajectories, 
-                                                                method='L-BFGS-B',
-                                                                options={'maxiter': 2000,
+        self.optimizer = []
+        self.optimizer.append(OptimizationProcedure(self, self.loss_trajectories, 0, {'maxiter': 500,
+                                                                          'maxfun': 5000,
+                                                                          'maxcor': 50,
+                                                                          'maxls': 50,
+                                                                          'ftol': 5.0 * np.finfo(float).eps}))
+        self.optimizer.append(OptimizationProcedure(self, self.loss, 1500, {'maxiter': 4000,
                                                                           'maxfun': 5000,
                                                                           'maxcor': 50,
                                                                           'maxls': 20,
-                                                                          'ftol': 5.0 * np.finfo(float).eps})
-        
-        self.optimizerAdam = tf.train.AdamOptimizer().minimize(self.loss, var_list=list_var_density)
-        self.optimizer = tf.contrib.opt.ScipyOptimizerInterface(self.loss,
-                                                                var_list=list_var_density,
-                                                                method='L-BFGS-B',
-                                                                options={'maxiter': 5000,
-                                                                          'maxfun': 5000,
-                                                                          'maxcor': 50,
-                                                                          'maxls': 20,
-                                                                          'ftol': 5.0 * np.finfo(float).eps})
-        
-        self.optimizerPrecise = tf.contrib.opt.ScipyOptimizerInterface(self.lossPrecise,
-                                                                method='L-BFGS-B',
-                                                                options={'maxiter': 10000,
+                                                                          'ftol': 5.0 * np.finfo(float).eps}))
+        self.optimizer.append(OptimizationProcedure(self, self.loss_precise, 0, {'maxiter': 10000,
                                                                           'maxfun': 50000,
                                                                           'maxcor': 150,
                                                                           'maxls': 75,
-                                                                          'ftol': 1.0 * np.finfo(float).eps})
-        
+                                                                          'ftol': 1.0 * np.finfo(float).eps}))
 
         init = tf.global_variables_initializer()
         self.sess.run(init)
@@ -154,7 +149,6 @@ class NeuralNetwork():
     def neural_network(self, X, weights, biases, act=tf.nn.tanh):
         num_layers = len(weights) + 1
 
-        # H = (X - lb) / (ub - lb)
         H = X
         for l in range(num_layers - 2):
             W, b = weights[l], biases[l]
@@ -164,26 +158,27 @@ class NeuralNetwork():
         return tf.add(tf.matmul(H, W), b)
 
     def net_u(self, x, t):
-        u = self.neural_network(tf.concat([x,t],1), self.weights_density, 
-                                self.biases_density, act=self.act_density)
-        return u
+        u_tanh = self.neural_network(tf.concat([x,t],1), self.weights_density, 
+                                self.biases_density, act=tf.nn.tanh)
+        # u_relu = self.neural_network(tf.concat([x,t],1), self.weights_density_relu, 
+        #                         self.biases_density_relu, act=tf.nn.relu)
+        return u_tanh
 
     def net_f(self, x, t):
         u = self.net_u(x, t)
         u_t = tf.gradients(u, t)[0]
         u_x = tf.gradients(u, x)[0]
         u_xx = tf.gradients(u_x, x)[0]
-        # f = u_t + self.VfVar * (1 - 2 * u) * u_x - self.gamma_var**2 * u_xx
         f = u_t - self.VfVar * u * u_x - self.gamma_var**2 * u_xx
         return f
     
     def net_x(self, t):
-        xTanh = self.neural_network(t, self.weights_trajectories, 
+        x_tanh = self.neural_network(t, self.weights_trajectories, 
                                     self.biases_trajectories, act=tf.nn.tanh)
-        xRelu = self.neural_network(t, self.weights_trajectoriesRelu, 
-                                                 self.biases_trajectoriesRelu,
+        x_relu = self.neural_network(t, self.weights_trajectories_relu, 
+                                                 self.biases_trajectories_relu,
                                                  act=tf.nn.relu)
-        return xTanh + xRelu
+        return self.weight_tanh*x_tanh + self.weight_relu*x_relu
     
     def net_g(self, t):
         x_trajectories = self.net_x(t) 
@@ -192,7 +187,6 @@ class NeuralNetwork():
             x = tf.slice(x_trajectories, [0,i], [-1,1])
             x_t = tf.gradients(x, t)[0]
             u = self.net_u(x, t)
-            # g.append(x_t - self.VfVar * (1 - u))
             g.append(x_t - self.VfVar * (1 - u)/2)
         return g
 
@@ -219,55 +213,10 @@ class NeuralNetwork():
                    self.x_f_tf: self.x_f, self.t_f_tf: self.t_f,
                    self.t_g_tf: self.t_g}
         
-        self.epoch = 1
-        print('*********************************')
-        print('*** TRAJECTORY RECONSTRUCTION ***')
-        print('*********************************')
-        self.optimizer_trajectories.minimize(self.sess,
-                                feed_dict=tf_dict,
-                                fetches=[self.MSEtrajectories, self.MSEg, self.loss_trajectories],
-                                loss_callback=self.loss_callback_trajectory)
-        
-        print('*********************************')
-        print('******** RECONSTRUCTION *********')
-        print('*********************************')
-        print('Adam')
-        self.epoch = 1
-        for _ in range(500):
-            if self.epoch%10 == 1:
-                self.loss_callback(self.sess.run(self.MSEu, {self.x_tf: self.x, self.t_tf: self.t, self.u_tf: self.u}), 
-                                self.sess.run(self.MSEf, {self.x_f_tf: self.x_f, self.t_f_tf: self.t_f}), 
-                                self.sess.run(self.MSEtrajectories, {self.x_tf: self.x, self.t_tf: self.t}), 
-                                self.sess.run(self.MSEg, {self.t_g_tf: self.t_g}), 
-                                self.sess.run(self.loss, tf_dict), 
-                                self.sess.run(self.gamma_var))
-            self.sess.run(self.optimizerAdam, tf_dict)
-            self.epoch = self.epoch + 1   
-            
-        self.loss_callback(self.sess.run(self.MSEu, {self.x_tf: self.x, self.t_tf: self.t, self.u_tf: self.u}), 
-                            self.sess.run(self.MSEf, {self.x_f_tf: self.x_f, self.t_f_tf: self.t_f}), 
-                            self.sess.run(self.MSEtrajectories, {self.x_tf: self.x, self.t_tf: self.t}), 
-                            self.sess.run(self.MSEg, {self.t_g_tf: self.t_g}), 
-                            self.sess.run(self.loss, tf_dict), 
-                            self.sess.run(self.gamma_var))
-        
-        print('L-BFGS-B')
-        self.epoch = 1
-        self.optimizer.minimize(self.sess,
-                                feed_dict=tf_dict,
-                                fetches=[self.MSEu, self.MSEf, self.MSEtrajectories, self.MSEg, self.loss, self.gamma_var],
-                                loss_callback=self.loss_callback)
-        
-        self.epoch = 1
-        print('*********************************')
-        print('******* RECONSTRUCTION 2 ********')
-        print('*********************************')          
-        self.optimizerPrecise.minimize(self.sess,
-                                feed_dict=tf_dict,
-                                fetches=[self.MSEu, self.MSEf, self.MSEtrajectories, self.MSEg, self.lossPrecise, self.gamma_var],
-                                loss_callback=self.loss_callback)
-        
-        return self.save_loss
+        for i in range(len(self.optimizer)):
+            print('---> STEP %.0f' % (i+1))
+            self.epoch = 1
+            self.optimizer[i].train(tf_dict)    
     
     def predict(self, x, t):
         x = np.float32(x)
@@ -276,3 +225,36 @@ class NeuralNetwork():
     
     def predict_trajectories(self, t):
         return self.sess.run(self.x_pred, {self.t_tf: t})
+    
+class OptimizationProcedure():
+    
+    def __init__(self, mother, loss, epochs, options):
+        self.loss = loss
+        self.optimizer_adam = tf.train.AdamOptimizer().minimize(loss)
+        self.optimizer_BFGS = tf.contrib.opt.ScipyOptimizerInterface(loss, 
+                                                                     method='L-BFGS-B', 
+                                                                     options=options)
+        self.mother = mother
+        self.epochs = epochs
+        
+        
+    def train(self, tf_dict):
+        mother = self.mother
+        print('------> ADAM')
+        for epoch in range(self.epochs):
+            mother.epoch = epoch + 1
+            if epoch%10 == 0:
+                mother.loss_callback(mother.sess.run(mother.MSEu, {mother.x_tf: mother.x, mother.t_tf: mother.t, mother.u_tf: mother.u}), 
+                                mother.sess.run(mother.MSEf, {mother.x_f_tf: mother.x_f, mother.t_f_tf: mother.t_f}), 
+                                mother.sess.run(mother.MSEtrajectories, {mother.x_tf: mother.x, mother.t_tf: mother.t}), 
+                                mother.sess.run(mother.MSEg, {mother.t_g_tf: mother.t_g}), 
+                                mother.sess.run(self.loss, tf_dict), 
+                                mother.sess.run(mother.gamma_var))
+            mother.sess.run(self.optimizer_adam, tf_dict)
+            
+        print('------> BFGS')
+        self.optimizer_BFGS.minimize(mother.sess,
+                                feed_dict=tf_dict,
+                                fetches=[mother.MSEu, mother.MSEf, mother.MSEtrajectories, 
+                                         mother.MSEg, self.loss, mother.gamma_var],
+                                loss_callback=mother.loss_callback)
