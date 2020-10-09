@@ -45,14 +45,10 @@ class NeuralNetwork():
 
         self.weights_density, self.biases_density = self.initialize_neural_network(layers_density, init, act="tanh")
         list_var_density = self.weights_density + self.biases_density
-        # self.weights_density_relu, self.biases_density_relu = self.initialize_neural_network(layers_density, init, act="relu")
-        # list_var_density = self.weights_density + self.weights_density_relu \
-        #     + self.biases_density + self.biases_density_relu
         list_var_density.append(self.gamma_var)
         
         self.weights_trajectories, self.biases_trajectories = self.initialize_neural_network(layers_trajectories, initWeights=initWeights, initBias=initBias, act="tanh")
         self.weights_trajectories_relu, self.biases_trajectories_relu = self.initialize_neural_network(layers_trajectories, initWeights=initWeights, initBias=initBias, act="relu")
-        # listVarTrajectories = self.weights_trajectories + self.biases_trajectories
         self.weight_tanh = tf.Variable(1, dtype=tf.float32, trainable=True)
         self.weight_relu = tf.Variable(0.01, dtype=tf.float32, trainable=True)
         
@@ -96,11 +92,11 @@ class NeuralNetwork():
                                                                           'maxcor': 50,
                                                                           'maxls': 50,
                                                                           'ftol': 5.0 * np.finfo(float).eps}))
-        self.optimizer.append(OptimizationProcedure(self, self.loss, 1500, {'maxiter': 4000,
+        self.optimizer.append(OptimizationProcedure(self, self.loss, 1000, {'maxiter': 4000,
                                                                           'maxfun': 5000,
                                                                           'maxcor': 50,
                                                                           'maxls': 20,
-                                                                          'ftol': 5.0 * np.finfo(float).eps}))
+                                                                          'ftol': 5.0 * np.finfo(float).eps}, var_list=list_var_density))
         self.optimizer.append(OptimizationProcedure(self, self.loss_precise, 0, {'maxiter': 10000,
                                                                           'maxfun': 50000,
                                                                           'maxcor': 150,
@@ -228,12 +224,13 @@ class NeuralNetwork():
     
 class OptimizationProcedure():
     
-    def __init__(self, mother, loss, epochs, options):
+    def __init__(self, mother, loss, epochs, options, var_list=None):
         self.loss = loss
-        self.optimizer_adam = tf.train.AdamOptimizer().minimize(loss)
-        self.optimizer_BFGS = tf.contrib.opt.ScipyOptimizerInterface(loss, 
-                                                                     method='L-BFGS-B', 
-                                                                     options=options)
+        self.optimizer_adam = tf.train.AdamOptimizer().minimize(loss, var_list=var_list)
+        self.optimizer_BFGS = tf.contrib.opt.ScipyOptimizerInterface(loss, var_list=var_list,
+                                                                         method='L-BFGS-B', 
+                                                                         options=options)
+
         self.mother = mother
         self.epochs = epochs
         
