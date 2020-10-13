@@ -59,8 +59,10 @@ def get_probe_vehicle_data(L=-1, Tmax=-1, selectedPacket=-1, totalPacket=-1):
     
     Nt2 = toBeSelected.shape[0]
     N = Nt2*Nxi
-    x = x_selected + np.random.normal(0, 3, N).reshape(Nt2, Nxi)
-    u_meas = u_selected + np.random.normal(0, 0.1, N).reshape(Nt2, Nxi)
+    noise_trajectory = np.random.normal(0, 2, N).reshape(Nt2, Nxi)
+    noise_trajectory = np.cumsum(noise_trajectory, axis=0)
+    x = x_selected + noise_trajectory
+    u_meas = u_selected + np.random.normal(0, 0.2, N).reshape(Nt2, Nxi)
     u_meas = np.maximum(np.minimum(u_meas, 1), 0)
     
     # x = x_selected
