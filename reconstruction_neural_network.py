@@ -24,8 +24,7 @@ def hms( seconds):
 
 class ReconstructionNeuralNetwork():
     
-    def __init__(self, x, t, u, L, Tmax, units=5, layers=(2, 1), Vf=1, 
-                 gamma=0, N_f=1000, N_g=100):
+    def __init__(self, x, t, rho, L, Tmax, V, F, N_f=1000, N_g=100):
         
         self.Nxi = x.shape[1]
         
@@ -36,14 +35,13 @@ class ReconstructionNeuralNetwork():
             layers.append(num_nodes_per_layer)
         layers.append(1)
         
-        x_train, t_train, u_train, X_f_train, t_g_train = self.createTrainingDataset(x, t, u, L, Tmax, N_f, N_g)
-        VfNorm = Vf*(self.ub[1] - self.lb[1]) / (self.ub[0] - self.lb[0])
-        gammaNorm = gamma * 2 * (self.ub[1] - self.lb[1]) / (self.ub[0] - self.lb[0])**2
-        
+        x_train, t_train, u_train, X_f_train, t_g_train = self.createTrainingDataset(x, t, rho, L, Tmax, N_f, N_g)
+        V_norm = lambda u: V((u+1)/2)*(self.ub[1] - self.lb[1]) / (self.ub[0] - self.lb[0])
+        F_norm = lambda u: F((u+1)/2)*(self.ub[1] - self.lb[1]) / (self.ub[0] - self.lb[0])
         
         self.neural_network = NeuralNetwork(x_train, t_train, u_train, X_f_train, t_g_train, layers_density=layers, 
                                               layers_trajectories=(1, 2*self.Nxi, 2*self.Nxi, 2*self.Nxi, self.Nxi),
-                                              Vf=VfNorm, gamma=gammaNorm)
+                                              V=V_norm, F=F_norm)
         self.train()
             
     def createTrainingDataset(self, x, t, u, L, Tmax, N_f, N_g):       
@@ -52,8 +50,8 @@ class ReconstructionNeuralNetwork():
         self.ub = np.array([np.amax(x), np.amax(t)])
         self.lb[0], self.lb[1] = 0, 0
         
-        x = 2*(x - self.lb[0])/(self.ub[0] - self.lb[0])-1
-        t = 2*(t - self.lb[1])/(self.ub[1] - self.lb[1])-1
+        x = 2*(x - self.lb[0])/(self.ub[0] - self.lb[0]) - 1
+        t = 2*(t - self.lb[1])/(self.ub[1] - self.lb[1]) - 1
         u = 2*u-1
         
         X_f = np.array([2, 2])*lhs(2, samples=N_f)
