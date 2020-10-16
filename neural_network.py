@@ -27,15 +27,15 @@ class NeuralNetwork():
         Parameters
         ----------
         x : 2D numpy array of shape (N_data, N)
-            space coordinate of training points.
+            standardized space coordinate of training points.
         t : 1D numpy array of shape (N_data, 1)
-            time coordinate of training points.
+            standardized time coordinate of training points.
         u : 2D numpy array of shape (N_data, N)
-            density values at training points.
+            standardized density values at training points.
         X_f : 2D numpy array of shape (N_F, 2)
-            (space, time) coordinate of F physics training points.
+            standardized (space, time) coordinate of F physics training points.
         t_g : 1D numpy array of shape (N_G, 1)
-            time coordinate of G physics training points.
+            standardized time coordinate of G physics training points.
         layers_density : list of size N_L
             List of integers corresponding to the number of neurons in each
             for the neural network Theta.
@@ -43,9 +43,9 @@ class NeuralNetwork():
             List of integers corresponding to the number of neurons in each 
             layer for the neural network Phi.
         V : lambda function
-            Velocity of an agent.
+            standardized velocity of an agent.
         F : lambda function
-            Flux function of the hyperbolic PDE.
+            standardized flux function of the hyperbolic PDE.
         init_density : list of two lists, optional
             Initial values for the weight and biases of Theta. 
             The default is [[], []].
@@ -270,19 +270,19 @@ class NeuralNetwork():
 
     def net_u(self, x, t):
         '''
-        return the normalized value of rho hat at position (t, x)
+        return the standardized value of rho hat at position (t, x)
 
         Parameters
         ----------
         x : tensor
-            space location.
+            standardized space location.
         t : tensor
-            time location.
+            standardized time location.
 
         Returns
         -------
         u_tanh : tensor
-            normalized estimated density tensor.
+            standardized estimated density tensor.
 
         '''
         
@@ -297,9 +297,9 @@ class NeuralNetwork():
         Parameters
         ----------
         x : tensor
-            space location.
+            standardized space location.
         t : tensor
-            time location.
+            standardized time location.
 
         Returns
         -------
@@ -330,12 +330,12 @@ class NeuralNetwork():
         Parameters
         ----------
         t : tensor
-            time.
+            standardized time.
 
         Returns
         -------
         list of tensor
-            list of normalized estimated physics g tensor.
+            list of standardized estimated physics g tensor.
 
         '''
         
@@ -387,19 +387,19 @@ class NeuralNetwork():
     
     def predict(self, x, t):
         '''
-        Return the normalized estimated density at (t, x)
+        Return the standardized estimated density at (t, x)
 
         Parameters
         ----------
         x : numpy array (?, )
-            space coordinate.
+            standardized space coordinate.
         t : numpy array (?, )
-            time coordinate.
+            standardized time coordinate.
 
         Returns
         -------
         numpy array
-            normalized estimated density.
+            standardized estimated density.
 
         '''
         x = np.float32(x)
@@ -408,17 +408,17 @@ class NeuralNetwork():
     
     def predict_trajectories(self, t):
         '''
-        Return the normalized estimated agents' locations at t
+        Return the standardized estimated agents' locations at t
 
         Parameters
         ----------
         t : numpy array (?, )
-            time coordinate.
+            standardized time coordinate.
 
         Returns
         -------
         numpy array
-            normalized estimated agents location.
+            standardized estimated agents location.
 
         '''
         return self.sess.run(self.x_pred, {self.t_tf: t})

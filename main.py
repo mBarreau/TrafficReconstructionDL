@@ -137,6 +137,7 @@ xiPos = L*lhs(1, samples=Npv).reshape((Npv,))
 xiPos = np.flip(np.sort(xiPos))
 xiT = np.array([0]*Npv)
 
+# Godunov simulation of the PDE
 simu_godunov = g.SimuGodunov(Vf, gamma, xiPos, xiT, L=Ltotal, Tmax=Tmax,
                              zMin=0, zMax=1, Nx=1000, rhoBar=rhoBar, rhoSigma=rhoSigma)
 rho = simu_godunov.simulation()

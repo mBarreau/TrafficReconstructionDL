@@ -12,11 +12,8 @@ import matplotlib.pyplot as plt
 from time import time
 from pyDOE import lhs
 from neural_network import NeuralNetwork
-
-# np.random.seed(12345)
-# tf.set_random_seed(12345)
         
-def hms( seconds):
+def hms(seconds):
     m, s = divmod(seconds, 60)
     h, m = divmod(m, 60)
     h, m, s = int(h), int(m), int(s)
@@ -25,26 +22,89 @@ def hms( seconds):
 class ReconstructionNeuralNetwork():
     
     def __init__(self, x, t, rho, L, Tmax, V, F, N_f=1000, N_g=100):
+        '''
+        Initialize a neural network for density reconstruction
+
+        Parameters
+        ----------
+        x : 2D numpy array of shape (N_data, N)
+            space coordinate of training points.
+        t : 1D numpy array of shape (N_data, 1)
+            time coordinate of training points.
+        rho : 2D numpy array of shape (N_data, N)
+            density values at training points.
+        L : float64
+            Length of the spacial domain.
+        Tmax : float64
+            Length of the temporal domain.
+        V : lambda function
+            Velocity of the agents function.
+        F : lambda function
+            Flux of the PDE (velocity of the characteristics).
+        N_f : integer, optional
+            Number of physical points for F. The default is 1000.
+        N_g : integer, optional
+            Number of physical points for G. The default is 100.
+
+        Returns
+        -------
+        None.
+
+        '''
         
-        self.Nxi = x.shape[1]
+        self.Nxi = x.shape[1] # Number of agents
         
-        num_hidden_layers = int(Tmax*8/100)
-        num_nodes_per_layer = int(20*L/7000)
-        layers = [2]
+        num_hidden_layers = int(Tmax*8/100) 
+        num_nodes_per_layer = int(20*L/7000) 
+        layers = [2] # There are two inputs: space and time
         for _ in range(num_hidden_layers):
             layers.append(num_nodes_per_layer)
         layers.append(1)
         
-        x_train, t_train, u_train, X_f_train, t_g_train = self.createTrainingDataset(x, t, rho, L, Tmax, N_f, N_g)
-        V_norm = lambda u: V((u+1)/2)*(self.ub[1] - self.lb[1]) / (self.ub[0] - self.lb[0])
-        F_norm = lambda u: F((u+1)/2)*(self.ub[1] - self.lb[1]) / (self.ub[0] - self.lb[0])
+        x_train, t_train, u_train, X_f_train, t_g_train = self.createTrainingDataset(x, t, rho, L, Tmax, N_f, N_g) # Creation of standardized training dataset
+        V_standard = lambda u: V((u+1)/2)*(self.ub[1] - self.lb[1]) / (self.ub[0] - self.lb[0]) # Standardized velocity function
+        F_standard = lambda u: F((u+1)/2)*(self.ub[1] - self.lb[1]) / (self.ub[0] - self.lb[0]) # Standardized flux function
         
         self.neural_network = NeuralNetwork(x_train, t_train, u_train, X_f_train, t_g_train, layers_density=layers, 
                                               layers_trajectories=(1, 2*self.Nxi, 2*self.Nxi, 2*self.Nxi, self.Nxi),
-                                              V=V_norm, F=F_norm)
-        self.train()
+                                              V=V_standard, F=F_standard) # Creation of the neural network
+        self.train() # Training of the neural network
             
-    def createTrainingDataset(self, x, t, u, L, Tmax, N_f, N_g):       
+    def createTrainingDataset(self, x, t, rho, L, Tmax, N_f, N_g):       
+        '''
+        Standardize the dataset
+
+        Parameters
+        ----------
+        x : TYPE
+            DESCRIPTION.
+        t : TYPE
+            DESCRIPTION.
+        rho : TYPE
+            DESCRIPTION.
+        L : TYPE
+            DESCRIPTION.
+        Tmax : TYPE
+            DESCRIPTION.
+        N_f : TYPE
+            DESCRIPTION.
+        N_g : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        x : TYPE
+            DESCRIPTION.
+        t : TYPE
+            DESCRIPTION.
+        u : TYPE
+            DESCRIPTION.
+        X_f : TYPE
+            DESCRIPTION.
+        t_g : TYPE
+            DESCRIPTION.
+
+        '''
         
         self.lb = np.array([np.amin(x), np.amin(t)])
         self.ub = np.array([np.amax(x), np.amax(t)])
@@ -52,7 +112,7 @@ class ReconstructionNeuralNetwork():
         
         x = 2*(x - self.lb[0])/(self.ub[0] - self.lb[0]) - 1
         t = 2*(t - self.lb[1])/(self.ub[1] - self.lb[1]) - 1
-        u = 2*u-1
+        rho = 2*rho-1
         
         X_f = np.array([2, 2])*lhs(2, samples=N_f)
         X_f = X_f - np.ones(X_f.shape)
@@ -60,18 +120,40 @@ class ReconstructionNeuralNetwork():
         
         X_trajectories = np.array([x.reshape(-1,), (np.tile(t, (1, self.Nxi))).reshape(-1,)], dtype=np.float32).T
         X_f = np.vstack([X_f, X_trajectories])
+        np.random.shuffle(X_f)
         
-        # np.random.shuffle(X_f)
-        # return (t_u_shuffled, pv_u_shuffled, u_shuffled, X_f, t_trajectories, x_trajectories, t_g)
-        
-        return (x, t, u, X_f, t_g)
+        return (x, t, rho, X_f, t_g)
 
     def train(self):
+        '''
+        Train the neural network
+
+        Returns
+        -------
+        None.
+
+        '''
         start = time()
         self.neural_network.train()
         hms(time() - start)
         
     def predict(self, x, t):
+        '''
+        Return the estimated density at (t, x)
+
+        Parameters
+        ----------
+        x : numpy array (?, )
+            space coordinate.
+        t : numpy array (?, )
+            time coordinate.
+
+        Returns
+        -------
+        numpy array
+            estimated density.
+
+        '''
         
         x = 2*(x - self.lb[0])/(self.ub[0] - self.lb[0])-1
         t = 2*(t - self.lb[1])/(self.ub[1] - self.lb[1])-1
@@ -79,12 +161,43 @@ class ReconstructionNeuralNetwork():
         return self.neural_network.predict(x, t)/2+0.5
     
     def predict_trajectories(self, t):
+        '''
+        Return the estimated agents' locations at t
+
+        Parameters
+        ----------
+        t : numpy array (?, )
+            time coordinate.
+
+        Returns
+        -------
+        numpy array
+            estimated agents location.
+
+        '''
         
         t = 2*(t - self.lb[1])/(self.ub[1] - self.lb[1])-1        
         return (self.neural_network.predict_trajectories(t)+1)*(self.ub[0] - self.lb[0])/2 + self.lb[0]
     
     
-    def plot(self, axisPlot, u):
+    def plot(self, axisPlot, rho):
+        '''
+        
+
+        Parameters
+        ----------
+        axisPlot : tuple of two 1D-numpy arrays of shape (?,)
+            Plot mesh.
+        rho : 2D numpy array
+            Values of the real density at axisPlot.
+
+        Returns
+        -------
+        list of two Figures
+            return the reconstruction and error figures.
+
+        '''
+        
         x = axisPlot[0]
         t = axisPlot[1]
 
@@ -100,12 +213,12 @@ class ReconstructionNeuralNetwork():
         xstar = XY_prediction[:, 0:1]
         tstar = XY_prediction[:, 1:2]
         
-        U_prediction = self.predict(xstar, tstar).reshape(Nx, Nt)
+        rho_prediction = self.predict(xstar, tstar).reshape(Nx, Nt)
         X_prediction = self.predict_trajectories(t.reshape(t.shape[0], 1)).reshape(Nt, self.Nxi)
 
         figReconstruction = plt.figure(figsize=(7.5, 5))
         X, Y = np.meshgrid(t, x)
-        plt.pcolor(X, Y, U_prediction, vmin=0.0, vmax=1.0, shading='auto', rasterized=True)
+        plt.pcolor(X, Y, rho_prediction, vmin=0.0, vmax=1.0, shading='auto', rasterized=True)
         plt.plot(t, X_prediction, color="orange")
         plt.xlabel(r'Time [s]')
         plt.ylabel(r'Position [m]')
@@ -120,7 +233,7 @@ class ReconstructionNeuralNetwork():
         
         figError = plt.figure(figsize=(7.5, 5))
         X, Y = np.meshgrid(t, x)
-        plt.pcolor(X, Y, np.abs(U_prediction-u), vmin=0.0, vmax=1.0, shading='auto', rasterized=True)
+        plt.pcolor(X, Y, np.abs(rho_prediction-rho), vmin=0.0, vmax=1.0, shading='auto', rasterized=True)
         plt.plot(t, X_prediction, color="orange")
         plt.xlabel(r'Time [s]')
         plt.ylabel(r'Position [m]')

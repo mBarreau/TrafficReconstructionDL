@@ -10,9 +10,6 @@ import matplotlib.pyplot as plt
 from scipy.stats import truncnorm
 from pyDOE import lhs
 
-def get_truncated_normal(mean=0, sd=1, low=0, upp=10):
-    return truncnorm((low - mean) / sd, (upp - mean) / sd, loc=mean, scale=sd)
-
 class PhysicsSim:
     
     def __init__(self, L, Nx, Tmax, Vf=1, gamma=0.05):
@@ -47,7 +44,7 @@ class ProbeVehicles:
             
     def update(self, z, n):
         
-        for j in range(self.Nxi): # ODE for the probes vehicles
+        for j in range(self.Nxi): # ODE for the agents
             if self.xi[j,n] >= self.sim.Nx or n*self.sim.deltaT < self.xiT[j]:
                 self.xiArray[j, n] = np.nan
                 continue
@@ -84,12 +81,6 @@ class ProbeVehicles:
     def plot(self, t):
         it = np.round(np.arange(0, self.sim.Nt, self.sim.Nt/len(t))).astype(int)
         xiArrayPlot = self.xiArray[:, it]
-        
-        # lb = np.array([np.amin(xiArrayPlot), np.amin(t)])
-        # ub = np.array([np.amax(xiArrayPlot), np.amax(t)])
-        # 
-        # t = 2*(t-lb[1])/(ub[1] - lb[1]) -1
-        # x = 2*(xiArrayPlot-lb[0])/(ub[0] - lb[0]) -1
         x = xiArrayPlot
         
         for i in range(self.Nxi):
@@ -112,7 +103,9 @@ class BoundaryConditions:
             self.randomGaussian = True
         
         if self.randomGaussian:
-            self.X = get_truncated_normal(mean=rhoBar, sd=rhoSigma, low=minZ0, upp=maxZ0)
+            self.X = truncnorm((minZ0 - rhoBar) / rhoSigma, 
+                               (maxZ0 - rhoBar) / rhoSigma, 
+                               loc=rhoBar, scale=rhoSigma)
             self.Npoints = [int(np.ceil(sim.Tmax/Tt)), int(np.ceil(sim.L/Tx))]
         else:
             Npoints = int(np.ceil(sim.Tmax*sinePuls/(2*np.pi)))
@@ -296,22 +289,9 @@ class SimuGodunov:
         self.t = np.linspace(0, self.sim.Tmax, self.sim.Nt)
         self.x = np.linspace(0, self.sim.L, self.sim.Nx)
         
-        # if NxPlot < 0:
-        #     NxPlot = min(1000, self.sim.Nx)
-        # if NtPlot < 0:
-        #     NtPlot = min(500, self.sim.Nt)
-            
-        # self.t = np.linspace(0, self.sim.Tmax, NtPlot)
-        # self.x = np.linspace(0, self.sim.L, NxPlot)
-        # it = np.round(np.arange(0, self.sim.Nt, self.sim.Nt/NtPlot)).astype(int)
-        # ix = np.round(np.arange(0, self.sim.Nx, self.sim.Nx/NxPlot)).astype(int)
-        # zPlot = z[ix, :]
-        # zPlot = zPlot[:, it]
-        
         fig = plt.figure(figsize=(7.5, 5))
         X, Y = np.meshgrid(self.t, self.x)
         plt.pcolor(X, Y, z, shading='auto', vmin=0.0, vmax=1.0, rasterized=True)
-        # plt.pcolor(X, Y, 2*zPlot-1, shading='auto', vmin=-1.0, vmax=1.0, rasterized=True)
         plt.xlabel(r'Time [s]')
         plt.ylabel(r'Position [m]')
         #plt.xlim(0, self.sim.Tmax)
