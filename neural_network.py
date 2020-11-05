@@ -355,8 +355,6 @@ class NeuralNetwork():
                   (self.epoch, MSEu, MSEf, MSEtrajectories, MSEg, gamma**2, total_loss))
             
         self.epoch += 1
-
-        self.save_loss.append(total_loss)
         
     def loss_callback_trajectory(self, MSEtrajectories, MSEg, total_loss):
         

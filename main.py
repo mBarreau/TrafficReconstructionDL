@@ -145,7 +145,7 @@ simu_godunov.plot()
 axisPlot = simu_godunov.getAxisPlot()
 
 # collect data from PV
-x_train, t_train, rho_train = get_probe_vehicle_data(selectedPacket=-1, totalPacket=-1, noise=noise)
+x_train, t_train, rho_train = get_probe_vehicle_data(selectedPacket=0.8, totalPacket=-1, noise=noise)
 # to collect data from random points in the domain [0, L] \times [0, T], use the parameters L=L, Tmax=T 
 
 trained_neural_network = rn.ReconstructionNeuralNetwork(x_train, t_train, rho_train, 
