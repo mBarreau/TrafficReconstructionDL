@@ -27,11 +27,11 @@ class ReconstructionNeuralNetwork():
 
         Parameters
         ----------
-        x : 2D numpy array of shape (N_data, N)
+        x : list of N numpy array of shape (?,)
             space coordinate of training points.
-        t : 1D numpy array of shape (N_data, 1)
+        t : List of N numpy array of shape (?,)
             time coordinate of training points.
-        rho : 2D numpy array of shape (N_data, N)
+        rho : list of N numpy array of shape (?,)
             density values at training points.
         L : float64
             Length of the spacial domain.
@@ -76,33 +76,33 @@ class ReconstructionNeuralNetwork():
 
         Parameters
         ----------
-        x : TYPE
-            DESCRIPTION.
-        t : TYPE
-            DESCRIPTION.
-        rho : TYPE
-            DESCRIPTION.
-        L : TYPE
-            DESCRIPTION.
-        Tmax : TYPE
-            DESCRIPTION.
-        N_f : TYPE
-            DESCRIPTION.
-        N_g : TYPE
-            DESCRIPTION.
+        x : list of N arrays of float64 (?,)
+            Position of agents along time.
+        t : list of N arrays of float64 (?,)
+            Time coordinate of agents.
+        rho : list of N arrays of float64 (?,)
+            Measurement from each agent.
+        L : float
+            Length of the road.
+        Tmax : float
+            Time-window.
+        N_f : int
+            Number of physical points for f.
+        N_g : int
+            Number of physical points for g.
 
         Returns
         -------
-        x : TYPE
-            DESCRIPTION.
-        t : TYPE
-            DESCRIPTION.
-        u : TYPE
-            DESCRIPTION.
-        X_f : TYPE
-            DESCRIPTION.
-        t_g : TYPE
-            DESCRIPTION.
+        x : list of N arrays of float64 (?,)
+            Standardized position of agents along time.
+        t : list of N arrays of float64 (?,)
+            Standardized time coordinate of agents.
+        u : list of N arrays of float64 (?,)
+            Standardized measurement from each agent.
+        X_f : 2D array of shape (N_f, 2)
+            Standardized location of physical points for f.
+        t_g : list of float64
+            List of standardized phisical points for g.
 
         '''
         
@@ -116,13 +116,11 @@ class ReconstructionNeuralNetwork():
         
         X_f = np.array([2, 2])*lhs(2, samples=N_f)
         X_f = X_f - np.ones(X_f.shape)
+        np.random.shuffle(X_f)
+        
         t_g = []
         for i in range(self.Nxi):
             t_g.append(np.amin(t[i]) + lhs(1, samples=N_g)*(np.amax(t[i]) - np.amin(t[i])))
-        
-        # X_trajectories = np.array([x.reshape(-1,), (np.tile(t, (1, self.Nxi))).reshape(-1,)], dtype=np.float32).T
-        # X_f = np.vstack([X_f, X_trajectories])
-        np.random.shuffle(X_f)
         
         return (x, t, rho, X_f, t_g)
 
