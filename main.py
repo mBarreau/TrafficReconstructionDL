@@ -24,7 +24,7 @@ L = 5000 # Length of the road
 rhoBar = 0.2 # Average density of cars on the road
 rhoMax = 120 # Number of vehicles per kilometer
 rhoSigma = 0.6 # initial condition standard deviation
-noise = False # noise on the measurements and on the trajectories
+noise = True # noise on the measurements and on the trajectories
 data_from_pv = True # collect data from PV or randomly inside the domain
 V = lambda rho: Vf*(1-rho) # Equilibrium velocity function
 F = lambda rho: Vf*(1-2*rho) # Flux function of the PDE
@@ -122,7 +122,7 @@ def get_probe_vehicle_data(L=-1, Tmax=-1, selectedPacket=-1, totalPacket=-1, noi
                 noise_meas = np.array([0]*Nt)
                 
             x_selected.append(np.reshape(x_true[toBeSelected, k] + noise_trajectory[toBeSelected], (-1,1)))
-            rho_temp = rho_true[toBeSelected, k] + noise_meas[toBeSelected]
+            rho_temp = rho_true[toBeSelected, k] + noise_meas
             rho_selected.append(np.reshape(np.maximum(np.minimum(rho_temp, 1), 0), (-1,1)))
             t_selected.append(np.reshape(t[toBeSelected], (-1,1)))
 
