@@ -26,15 +26,15 @@ class NeuralNetwork():
 
         Parameters
         ----------
-        x : 2D numpy array of shape (N_data, N)
+        x : list of N numpy array of shape (?,)
             standardized space coordinate of training points.
-        t : 1D numpy array of shape (N_data, 1)
+        t : List of N numpy array of shape (?,)
             standardized time coordinate of training points.
-        u : 2D numpy array of shape (N_data, N)
+        u : list of N numpy array of shape (?,)
             standardized density values at training points.
         X_f : 2D numpy array of shape (N_F, 2)
             standardized (space, time) coordinate of F physics training points.
-        t_g : 1D numpy array of shape (N_G, 1)
+        t_g : list of N numpy array of shape (N_G, 1)
             standardized time coordinate of G physics training points.
         layers_density : list of size N_L
             List of integers corresponding to the number of neurons in each
@@ -61,22 +61,22 @@ class NeuralNetwork():
 
         self.x = x 
         self.t = t
-        self.u = u.reshape((-1,1)) 
+        self.u = u
 
         self.x_f = X_f[:, 0:1]
         self.t_f = X_f[:, 1:2]
         self.t_g = t_g
         
-        self.N = layers_trajectories[-1] # Number of agents
+        self.N = len(self.x) # Number of agents
 
         self.V = V
         self.F = F
         self.gamma_var = tf.Variable(tf.random.truncated_normal([1,1], mean=0, 
                                                          stddev=0.01, dtype=tf.float32), 
                                      dtype=tf.float32, trainable=True)
-        self.noise_rho_bar = tf.Variable(tf.random.truncated_normal([1,1], mean=0, 
+        self.noise_rho_bar = [tf.Variable(tf.random.truncated_normal([1,1], mean=0, 
                                                          stddev=0.01, dtype=tf.float32), 
-                                     dtype=tf.float32, trainable=True)
+                                     dtype=tf.float32, trainable=True)  for _ in range(self.N)]
 
         # Initilization of the neural networks
         
@@ -84,67 +84,89 @@ class NeuralNetwork():
         self.weights_density, self.biases_density = self.initialize_neural_network(layers_density, init_density[0], init_density[1], act="tanh")
         list_var_density = self.weights_density + self.biases_density
         list_var_density.append(self.gamma_var)
-        list_var_density.append(self.noise_rho_bar)
+        list_var_density = list_var_density + self.noise_rho_bar
         
         # Phi neural network
-        self.weights_trajectories, self.biases_trajectories = self.initialize_neural_network(layers_trajectories, 
-                                                                                             initWeights=init_trajectories[0][0], 
-                                                                                             initBias=init_trajectories[0][1], 
-                                                                                             act="tanh")
-        self.weights_trajectories_relu, self.biases_trajectories_relu = self.initialize_neural_network(layers_trajectories, 
-                                                                                                       initWeights=init_trajectories[1][0], 
-                                                                                                       initBias=init_trajectories[1][1], 
-                                                                                                       act="relu")
-        self.weight_tanh = tf.Variable(init_trajectories[-2], dtype=tf.float32, trainable=True)
-        self.weight_relu = tf.Variable(init_trajectories[-1], dtype=tf.float32, trainable=True)
+        self.weights_trajectories = []
+        self.biases_trajectories = []
+        self.weights_trajectories_relu = []
+        self.biases_trajectories_relu = []
+        self.weight_tanh = []
+        self.weight_relu = []
+        for i in range(self.N):
+            weights_trajectories, biases_trajectories = self.initialize_neural_network(layers_trajectories, 
+                                                                                                 initWeights=init_trajectories[0][0], 
+                                                                                                 initBias=init_trajectories[0][1], 
+                                                                                                 act="tanh")
+            self.weights_trajectories.append(weights_trajectories)
+            self.biases_trajectories.append(biases_trajectories)
+            
+            weights_trajectories_relu, biases_trajectories_relu = self.initialize_neural_network(layers_trajectories, 
+                                                                                                           initWeights=init_trajectories[1][0], 
+                                                                                                           initBias=init_trajectories[1][1], 
+                                                                                                           act="relu")
+            self.weights_trajectories_relu.append(weights_trajectories_relu)
+            self.biases_trajectories_relu.append(biases_trajectories_relu)
+            
+            self.weight_tanh.append(tf.Variable(init_trajectories[-2], dtype=tf.float32, trainable=True))
+            self.weight_relu.append(tf.Variable(init_trajectories[-1], dtype=tf.float32, trainable=True))
         
         # Start a TF session
         self.sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True,
                                                      log_device_placement=True))
 
         # PDE part
-        self.x_tf = tf.placeholder(tf.float32, shape=[None, self.x.shape[1]])
-        self.t_tf = tf.placeholder(tf.float32, shape=[None, self.t.shape[1]])
-        self.u_tf = tf.placeholder(tf.float32, shape=[None, self.u.shape[1]])
+        self.x_tf = [tf.placeholder(tf.float32, shape=[None, 1]) for _ in range(self.N)]
+        self.t_tf = [tf.placeholder(tf.float32, shape=[None, 1]) for _ in range(self.N)]
+        self.u_tf = [tf.placeholder(tf.float32, shape=[None, 1]) for _ in range(self.N)]
         self.x_f_tf = tf.placeholder(tf.float32, shape=[None, self.x_f.shape[1]])
         self.t_f_tf = tf.placeholder(tf.float32, shape=[None, self.t_f.shape[1]])
         
-        self.u_pred = self.net_u(tf.reshape(self.net_x(self.t_tf), (-1,1)), 
-                                  tf.reshape(tf.tile(self.t_tf, [1, self.N]), (-1,1)))
-        # Uncomment the following line if measurements are not obtained from PV
-        # self.u_pred = self.net_u(tf.reshape(self.x_tf, (-1,1)), 
-        #                          tf.reshape(tf.tile(self.t_tf, [1, self.N]), (-1,1)))
+        self.u_pred = [self.net_u(self.net_x_pv(self.t_tf[i], i), self.t_tf[i]) for i in range(self.N)] 
         self.f_pred = self.net_f(self.x_f_tf, self.t_f_tf)        
         
         # Agents part
-        self.t_g_tf = tf.placeholder(tf.float32, shape=[None, self.t_g.shape[1]])
+        self.t_g_tf = [tf.placeholder(tf.float32, shape=[None, 1]) for _ in range(self.N)]
         
         self.x_pred = self.net_x(self.t_tf)
         self.g_pred = self.net_g(self.t_g_tf)
 
         # MSE part
-        self.MSEu = tf.reduce_mean(tf.square(self.u_tf - self.u_pred - self.noise_rho_bar))
+        self.MSEu = 0
+        for i in range(self.N):
+            self.MSEu = self.MSEu + tf.reduce_mean(tf.square(self.u_tf[i] - self.u_pred[i] - self.noise_rho_bar[i]))/self.N
+        
         self.MSEf = tf.reduce_mean(tf.square(self.f_pred))
         
-        self.MSEtrajectories = tf.reduce_sum(tf.square(self.x_tf - self.x_pred))/self.N
-        self.MSEg = tf.reduce_mean(tf.square(self.g_pred))
+        self.MSEtrajectories = 0
+        self.MSEg = 0
+        for i in range(self.N):
+            self.MSEtrajectories = self.MSEtrajectories + tf.reduce_mean(tf.square(self.x_tf[i] - self.x_pred[i]))/self.N
+            self.MSEg = self.MSEg + tf.reduce_mean(tf.square(self.g_pred[i]))/self.N
         
-        self.loss_trajectories = self.MSEtrajectories + 0.5*self.MSEg
-        self.loss = self.MSEu + 0.1*self.MSEf + 0.5*self.loss_trajectories
-        self.loss_precise = self.MSEu + self.MSEf + self.loss_trajectories + 0.1*tf.square(self.gamma_var)
+        self.loss_trajectories = self.MSEtrajectories + 0*self.MSEg
+        self.loss = self.MSEu + 0.1*self.MSEf + 0.5*self.MSEtrajectories + 0.1*self.MSEg
+        self.loss_precise = self.MSEu + self.MSEf + self.MSEtrajectories + 0.5*self.MSEg + 0.1*tf.square(self.gamma_var)
         
         # Definition of the training procedure
         self.optimizer = []
-        self.optimizer.append(OptimizationProcedure(self, self.loss_trajectories, 0, {'maxiter': 500,
+        self.optimizer.append(OptimizationProcedure(self, self.loss_trajectories, 100, {'maxiter': 500,
                                                                           'maxfun': 5000,
                                                                           'maxcor': 50,
                                                                           'maxls': 50,
                                                                           'ftol': 5.0 * np.finfo(float).eps}))
+        self.optimizer.append(OptimizationProcedure(self, self.MSEg, 100, {'maxiter': 500,
+                                                                          'maxfun': 5000,
+                                                                          'maxcor': 50,
+                                                                          'maxls': 50,
+                                                                          'ftol': 5.0 * np.finfo(float).eps},
+                                                    var_list=list_var_density))
         self.optimizer.append(OptimizationProcedure(self, self.loss, 1000, {'maxiter': 4000,
                                                                           'maxfun': 5000,
                                                                           'maxcor': 50,
                                                                           'maxls': 20,
-                                                                          'ftol': 5.0 * np.finfo(float).eps}, var_list=list_var_density))
+                                                                          'ftol': 5.0 * np.finfo(float).eps}, 
+                                                    var_list=list_var_density))
         self.optimizer.append(OptimizationProcedure(self, self.loss_precise, 0, {'maxiter': 10000,
                                                                           'maxfun': 50000,
                                                                           'maxcor': 150,
@@ -315,13 +337,49 @@ class NeuralNetwork():
         f = u_t + self.F(u) * u_x - self.gamma_var**2 * u_xx
         return f
     
-    def net_x(self, t):
-        x_tanh = self.neural_network(t, self.weights_trajectories, 
-                                    self.biases_trajectories, act=tf.nn.tanh)
-        x_relu = self.neural_network(t, self.weights_trajectories_relu, 
-                                                 self.biases_trajectories_relu,
+    def net_x_pv(self, t, i=0):
+        '''
+        return the standardized position of the agent i
+
+        Parameters
+        ----------
+        t : tensor (NOT A LIST)
+            standardized time.
+        i : int, optional
+            Number of the agent. The default is 0.
+
+        Returns
+        -------
+        tensor
+            standardized position of the agent i.
+
+        '''
+        x_tanh = self.neural_network(t, self.weights_trajectories[i], 
+                                    self.biases_trajectories[i], act=tf.nn.tanh)
+        x_relu = self.neural_network(t, self.weights_trajectories_relu[i], 
+                                                 self.biases_trajectories_relu[i],
                                                  act=tf.nn.relu)
-        return self.weight_tanh*x_tanh + self.weight_relu*x_relu
+        return self.weight_tanh[i]*x_tanh + self.weight_relu[i]*x_relu
+    
+    def net_x(self, t):
+        '''
+        return the standardized position of each agent
+
+        Parameters
+        ----------
+        t : list of tensors
+            standardized time.
+
+        Returns
+        -------
+        output : list of tensors
+            list of standardized positions of all agents at given time.
+
+        '''
+        output = []
+        for i in range(self.N):
+            output.append(self.net_x_pv(t[i], i))
+        return output
     
     def net_g(self, t):
         '''
@@ -329,7 +387,7 @@ class NeuralNetwork():
 
         Parameters
         ----------
-        t : tensor
+        t : lis of tensors
             standardized time.
 
         Returns
@@ -341,10 +399,9 @@ class NeuralNetwork():
         
         x_trajectories = self.net_x(t) 
         g = []
-        for i in range(x_trajectories.shape[1]):
-            x = tf.slice(x_trajectories, [0,i], [-1,1])
-            x_t = tf.gradients(x, t)[0]
-            u = self.net_u(x, t)
+        for i in range(len(x_trajectories)):
+            x_t = tf.gradients(x_trajectories[i], t[i])[0]
+            u = self.net_u(x_trajectories[i], t[i])
             g.append(x_t - self.V(u))
         return g
 
@@ -374,9 +431,22 @@ class NeuralNetwork():
 
         '''
         
-        tf_dict = {self.x_tf: self.x, self.t_tf: self.t, self.u_tf: self.u, 
-                   self.x_f_tf: self.x_f, self.t_f_tf: self.t_f,
-                   self.t_g_tf: self.t_g}
+        tf_dict = { }
+        
+        for k, v in zip(self.x_tf, self.x):
+            tf_dict[k] = v
+            
+        for k, v in zip(self.t_tf, self.t):
+            tf_dict[k] = v
+            
+        for k, v in zip(self.u_tf, self.u):
+            tf_dict[k] = v
+            
+        for k, v in zip(self.t_g_tf, self.t_g):
+            tf_dict[k] = v
+            
+        tf_dict[self.x_f_tf] = self.x_f
+        tf_dict[self.t_f_tf] = self.t_f
         
         for i in range(len(self.optimizer)):
             print('---> STEP %.0f' % (i+1))
@@ -410,16 +480,22 @@ class NeuralNetwork():
 
         Parameters
         ----------
-        t : numpy array (?, )
+        t : N numpy arrays of size (?,)
             standardized time coordinate.
 
         Returns
         -------
-        numpy array
+        lif of N numpy arrays
             standardized estimated agents location.
 
         '''
-        return self.sess.run(self.x_pred, {self.t_tf: t})
+        tf_dict = {}
+        i = 0
+        for k, v in zip(self.t_tf, t):
+            tf_dict[k] = v
+            i = i+1
+        
+        return self.sess.run(self.x_pred, tf_dict)
     
 class OptimizationProcedure():
     
@@ -440,17 +516,17 @@ class OptimizationProcedure():
         for epoch in range(self.epochs):
             mother.epoch = epoch + 1
             if epoch%10 == 0:
-                mother.loss_callback(mother.sess.run(mother.MSEu, {mother.x_tf: mother.x, mother.t_tf: mother.t, mother.u_tf: mother.u}), 
-                                mother.sess.run(mother.MSEf, {mother.x_f_tf: mother.x_f, mother.t_f_tf: mother.t_f}), 
-                                mother.sess.run(mother.MSEtrajectories, {mother.x_tf: mother.x, mother.t_tf: mother.t}), 
-                                mother.sess.run(mother.MSEg, {mother.t_g_tf: mother.t_g}), 
+                mother.loss_callback(mother.sess.run(mother.MSEu, tf_dict), 
+                                mother.sess.run(mother.MSEf, tf_dict), 
+                                mother.sess.run(mother.MSEtrajectories, tf_dict), 
+                                mother.sess.run(mother.MSEg, tf_dict), 
                                 mother.sess.run(self.loss, tf_dict), 
                                 mother.sess.run(mother.gamma_var))
             mother.sess.run(self.optimizer_adam, tf_dict)
-        mother.loss_callback(mother.sess.run(mother.MSEu, {mother.x_tf: mother.x, mother.t_tf: mother.t, mother.u_tf: mother.u}), 
-                             mother.sess.run(mother.MSEf, {mother.x_f_tf: mother.x_f, mother.t_f_tf: mother.t_f}), 
-                             mother.sess.run(mother.MSEtrajectories, {mother.x_tf: mother.x, mother.t_tf: mother.t}), 
-                             mother.sess.run(mother.MSEg, {mother.t_g_tf: mother.t_g}), 
+        mother.loss_callback(mother.sess.run(mother.MSEu, tf_dict), 
+                             mother.sess.run(mother.MSEf, tf_dict), 
+                             mother.sess.run(mother.MSEtrajectories, tf_dict), 
+                             mother.sess.run(mother.MSEg, tf_dict), 
                              mother.sess.run(self.loss, tf_dict), 
                              mother.sess.run(mother.gamma_var))
             

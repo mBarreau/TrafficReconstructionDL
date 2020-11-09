@@ -52,7 +52,7 @@ class ReconstructionNeuralNetwork():
 
         '''
         
-        self.Nxi = x.shape[1] # Number of agents
+        self.Nxi = len(x) # Number of agents
         
         num_hidden_layers = int(Tmax*8/100) 
         num_nodes_per_layer = int(20*L/7000) 
@@ -66,7 +66,7 @@ class ReconstructionNeuralNetwork():
         F_standard = lambda u: F((u+1)/2)*(self.ub[1] - self.lb[1]) / (self.ub[0] - self.lb[0]) # Standardized flux function
         
         self.neural_network = NeuralNetwork(x_train, t_train, u_train, X_f_train, t_g_train, layers_density=layers, 
-                                              layers_trajectories=(1, 2*self.Nxi, 2*self.Nxi, 2*self.Nxi, self.Nxi),
+                                              layers_trajectories=(1, 5, 5, 5, 1),
                                               V=V_standard, F=F_standard) # Creation of the neural network
         self.train() # Training of the neural network
             
@@ -110,16 +110,18 @@ class ReconstructionNeuralNetwork():
         self.ub = np.array([np.amax(x), np.amax(t)])
         self.lb[0], self.lb[1] = 0, 0
         
-        x = 2*(x - self.lb[0])/(self.ub[0] - self.lb[0]) - 1
-        t = 2*(t - self.lb[1])/(self.ub[1] - self.lb[1]) - 1
-        rho = 2*rho-1
+        x = [2*(x_temp - self.lb[0])/(self.ub[0] - self.lb[0]) - 1 for x_temp in x]
+        t = [2*(t_temp - self.lb[1])/(self.ub[1] - self.lb[1]) - 1 for t_temp in t]
+        rho = [2*rho_temp-1 for rho_temp in rho]
         
         X_f = np.array([2, 2])*lhs(2, samples=N_f)
         X_f = X_f - np.ones(X_f.shape)
-        t_g = 2*lhs(1, samples=N_g)-1
+        t_g = []
+        for i in range(self.Nxi):
+            t_g.append(np.amin(t[i]) + lhs(1, samples=N_g)*(np.amax(t[i]) - np.amin(t[i])))
         
-        X_trajectories = np.array([x.reshape(-1,), (np.tile(t, (1, self.Nxi))).reshape(-1,)], dtype=np.float32).T
-        X_f = np.vstack([X_f, X_trajectories])
+        # X_trajectories = np.array([x.reshape(-1,), (np.tile(t, (1, self.Nxi))).reshape(-1,)], dtype=np.float32).T
+        # X_f = np.vstack([X_f, X_trajectories])
         np.random.shuffle(X_f)
         
         return (x, t, rho, X_f, t_g)
@@ -166,18 +168,21 @@ class ReconstructionNeuralNetwork():
 
         Parameters
         ----------
-        t : numpy array (?, )
+        t : list of N numpy arrays of size (?, )
             time coordinate.
 
         Returns
         -------
-        numpy array
+        list of N numpy arrays
             estimated agents location.
 
         '''
         
-        t = 2*(t - self.lb[1])/(self.ub[1] - self.lb[1])-1        
-        return (self.neural_network.predict_trajectories(t)+1)*(self.ub[0] - self.lb[0])/2 + self.lb[0]
+        t = [2*(t[i] - self.lb[1])/(self.ub[1] - self.lb[1])-1 for i in range(self.Nxi)]
+        
+        output = self.neural_network.predict_trajectories(t)
+        output = [(output[i]+1)*(self.ub[0] - self.lb[0])/2 + self.lb[0] for i in range(self.Nxi)]
+        return output
     
     
     def plot(self, axisPlot, rho):
@@ -214,12 +219,14 @@ class ReconstructionNeuralNetwork():
         tstar = XY_prediction[:, 1:2]
         
         rho_prediction = self.predict(xstar, tstar).reshape(Nx, Nt)
-        X_prediction = self.predict_trajectories(t.reshape(t.shape[0], 1)).reshape(Nt, self.Nxi)
+        t_pred = [t.reshape(t.shape[0], 1)]*self.Nxi
+        X_prediction = self.predict_trajectories(t_pred)
 
         figReconstruction = plt.figure(figsize=(7.5, 5))
         X, Y = np.meshgrid(t, x)
         plt.pcolor(X, Y, rho_prediction, vmin=0.0, vmax=1.0, shading='auto', rasterized=True)
-        plt.plot(t, X_prediction, color="orange")
+        for i in range(self.Nxi):
+            plt.plot(t_pred[i], X_prediction[i], color="orange")
         plt.xlabel(r'Time [s]')
         plt.ylabel(r'Position [m]')
         plt.xlim(min(t), max(t))
@@ -234,7 +241,8 @@ class ReconstructionNeuralNetwork():
         figError = plt.figure(figsize=(7.5, 5))
         X, Y = np.meshgrid(t, x)
         plt.pcolor(X, Y, np.abs(rho_prediction-rho), vmin=0.0, vmax=1.0, shading='auto', rasterized=True)
-        plt.plot(t, X_prediction, color="orange")
+        for i in range(self.Nxi):
+            plt.plot(t_pred[i], X_prediction[i], color="orange")
         plt.xlabel(r'Time [s]')
         plt.ylabel(r'Position [m]')
         plt.xlim(min(t), max(t))
