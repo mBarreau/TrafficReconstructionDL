@@ -21,7 +21,7 @@ def hms(seconds):
 
 class ReconstructionNeuralNetwork():
     
-    def __init__(self, x, t, rho, L, Tmax, V, F, N_f=1000, N_g=100):
+    def __init__(self, x, t, rho, v, L, Tmax, V, F, N_f=1000, N_g=100):
         '''
         Initialize a neural network for density reconstruction
 
@@ -33,6 +33,8 @@ class ReconstructionNeuralNetwork():
             time coordinate of training points.
         rho : 2D numpy array of shape (N_data, N)
             density values at training points.
+        v : list of N numpy array of shape (?,)
+            velocity values at training points.
         L : float64
             Length of the spacial domain.
         Tmax : float64
@@ -61,48 +63,51 @@ class ReconstructionNeuralNetwork():
             layers.append(num_nodes_per_layer)
         layers.append(1)
         
-        x_train, t_train, u_train, X_f_train, t_g_train = self.createTrainingDataset(x, t, rho, L, Tmax, N_f, N_g) # Creation of standardized training dataset
-        V_standard = lambda u: V((u+1)/2)*(self.ub[1] - self.lb[1]) / (self.ub[0] - self.lb[0]) # Standardized velocity function
-        F_standard = lambda u: F((u+1)/2)*(self.ub[1] - self.lb[1]) / (self.ub[0] - self.lb[0]) # Standardized flux function
+        x_train, t_train, u_train, v_train, X_f_train, t_g_train = self.createTrainingDataset(x, t, rho, v, L, Tmax, N_f, N_g) # Creation of standardized training dataset
         
-        self.neural_network = NeuralNetwork(x_train, t_train, u_train, X_f_train, t_g_train, layers_density=layers, 
-                                              layers_trajectories=(1, 2*self.Nxi, 2*self.Nxi, 2*self.Nxi, self.Nxi),
-                                              V=V_standard, F=F_standard) # Creation of the neural network
+        self.neural_network = NeuralNetwork(x_train, t_train, u_train, v_train, X_f_train, t_g_train, layers_density=layers, 
+                                              layers_trajectories=(1, 5, 5, 5, 1),
+                                              layers_speed=(1, 5, 5, 1)) # Creation of the neural network
+
         self.train() # Training of the neural network
             
-    def createTrainingDataset(self, x, t, rho, L, Tmax, N_f, N_g):       
+    def createTrainingDataset(self, x, t, rho, v, L, Tmax, N_f, N_g):       
         '''
         Standardize the dataset
 
         Parameters
         ----------
-        x : TYPE
-            DESCRIPTION.
-        t : TYPE
-            DESCRIPTION.
-        rho : TYPE
-            DESCRIPTION.
-        L : TYPE
-            DESCRIPTION.
-        Tmax : TYPE
-            DESCRIPTION.
-        N_f : TYPE
-            DESCRIPTION.
-        N_g : TYPE
-            DESCRIPTION.
+        x : list of N arrays of float64 (?,)
+            Position of agents along time.
+        t : list of N arrays of float64 (?,)
+            Time coordinate of agents.
+        rho : list of N arrays of float64 (?,)
+            Density measurement from each agent.
+        v : list of N arrays of float64 (?,)
+            Velocity measurement from each agent.
+        L : float
+            Length of the road.
+        Tmax : float
+            Time-window.
+        N_f : int
+            Number of physical points for f.
+        N_g : int
+            Number of physical points for g.
 
         Returns
         -------
-        x : TYPE
-            DESCRIPTION.
-        t : TYPE
-            DESCRIPTION.
-        u : TYPE
-            DESCRIPTION.
-        X_f : TYPE
-            DESCRIPTION.
-        t_g : TYPE
-            DESCRIPTION.
+        x : list of N arrays of float64 (?,)
+            Standardized position of agents along time.
+        t : list of N arrays of float64 (?,)
+            Standardized time coordinate of agents.
+        u : list of N arrays of float64 (?,)
+            Standardized density measurement from each agent.
+        v : list of N arrays of float64 (?,)
+            Standardized velocity measurement from each agent.
+        X_f : 2D array of shape (N_f, 2)
+            Standardized location of physical points for f.
+        t_g : list of float64
+            List of standardized physical points for g.
 
         '''
         
@@ -110,9 +115,10 @@ class ReconstructionNeuralNetwork():
         self.ub = np.array([np.amax(x), np.amax(t)])
         self.lb[0], self.lb[1] = 0, 0
         
-        x = 2*(x - self.lb[0])/(self.ub[0] - self.lb[0]) - 1
-        t = 2*(t - self.lb[1])/(self.ub[1] - self.lb[1]) - 1
-        rho = 2*rho-1
+        x = [2*(x_temp - self.lb[0])/(self.ub[0] - self.lb[0]) - 1 for x_temp in x]
+        t = [2*(t_temp - self.lb[1])/(self.ub[1] - self.lb[1]) - 1 for t_temp in t]
+        rho = [2*rho_temp-1 for rho_temp in rho]
+        v = [v_temp*(self.ub[0] - self.lb[0])/(self.ub[1] - self.lb[1]) for v_temp in v]
         
         X_f = np.array([2, 2])*lhs(2, samples=N_f)
         X_f = X_f - np.ones(X_f.shape)
@@ -122,7 +128,7 @@ class ReconstructionNeuralNetwork():
         X_f = np.vstack([X_f, X_trajectories])
         np.random.shuffle(X_f)
         
-        return (x, t, rho, X_f, t_g)
+        return (x, t, rho, v, X_f, t_g)
 
     def train(self):
         '''

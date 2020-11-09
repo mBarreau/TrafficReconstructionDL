@@ -18,8 +18,8 @@ import numpy as np
 
 class NeuralNetwork():
 
-    def __init__(self, x, t, u, X_f, t_g, layers_density, layers_trajectories, 
-                 V, F, init_density=[[], []], init_trajectories=[[[], []], [[], []], 1, 0.01]):
+    def __init__(self, x, t, u, v, X_f, t_g, layers_density, layers_trajectories, layers_speed,
+                 init_density=[[], []], init_trajectories=[[[], []], [[], []], 1, 0.01], init_speed=[[], []]):
      
         '''
         Initialize a neural network for regression purposes.
@@ -32,20 +32,21 @@ class NeuralNetwork():
             standardized time coordinate of training points.
         u : 2D numpy array of shape (N_data, N)
             standardized density values at training points.
+        v : list of N numpy array of shape (?,)
+            standardized velocity values at training points.
         X_f : 2D numpy array of shape (N_F, 2)
             standardized (space, time) coordinate of F physics training points.
         t_g : 1D numpy array of shape (N_G, 1)
             standardized time coordinate of G physics training points.
-        layers_density : list of size N_L
+        layers_density : list of int (size N_L)
             List of integers corresponding to the number of neurons in each
             for the neural network Theta.
-        layers_trajectories : list
+        layers_trajectories : list of int
             List of integers corresponding to the number of neurons in each 
             layer for the neural network Phi.
-        V : lambda function
-            standardized velocity of an agent.
-        F : lambda function
-            standardized flux function of the hyperbolic PDE.
+        layers_speed : list of int
+            List of integers corresponding to the number of neurons in each 
+            layer for the neural network V.
         init_density : list of two lists, optional
             Initial values for the weight and biases of Theta. 
             The default is [[], []].
@@ -69,8 +70,6 @@ class NeuralNetwork():
         
         self.N = layers_trajectories[-1] # Number of agents
 
-        self.V = V
-        self.F = F
         self.gamma_var = tf.Variable(tf.random.truncated_normal([1,1], mean=0, 
                                                          stddev=0.01, dtype=tf.float32), 
                                      dtype=tf.float32, trainable=True)
@@ -87,16 +86,32 @@ class NeuralNetwork():
         list_var_density.append(self.noise_rho_bar)
         
         # Phi neural network
-        self.weights_trajectories, self.biases_trajectories = self.initialize_neural_network(layers_trajectories, 
-                                                                                             initWeights=init_trajectories[0][0], 
-                                                                                             initBias=init_trajectories[0][1], 
-                                                                                             act="tanh")
-        self.weights_trajectories_relu, self.biases_trajectories_relu = self.initialize_neural_network(layers_trajectories, 
-                                                                                                       initWeights=init_trajectories[1][0], 
-                                                                                                       initBias=init_trajectories[1][1], 
-                                                                                                       act="relu")
-        self.weight_tanh = tf.Variable(init_trajectories[-2], dtype=tf.float32, trainable=True)
-        self.weight_relu = tf.Variable(init_trajectories[-1], dtype=tf.float32, trainable=True)
+        self.weights_trajectories = []
+        self.biases_trajectories = []
+        self.weights_trajectories_relu = []
+        self.biases_trajectories_relu = []
+        self.weight_tanh = []
+        self.weight_relu = []
+        for i in range(self.N):
+            weights_trajectories, biases_trajectories = self.initialize_neural_network(layers_trajectories, 
+                                                                                                 initWeights=init_trajectories[0][0], 
+                                                                                                 initBias=init_trajectories[0][1], 
+                                                                                                 act="tanh")
+            self.weights_trajectories.append(weights_trajectories)
+            self.biases_trajectories.append(biases_trajectories)
+            
+            weights_trajectories_relu, biases_trajectories_relu = self.initialize_neural_network(layers_trajectories, 
+                                                                                                           initWeights=init_trajectories[1][0], 
+                                                                                                           initBias=init_trajectories[1][1], 
+                                                                                                           act="relu")
+            self.weights_trajectories_relu.append(weights_trajectories_relu)
+            self.biases_trajectories_relu.append(biases_trajectories_relu)
+            
+            self.weight_tanh.append(tf.Variable(init_trajectories[-2], dtype=tf.float32, trainable=True))
+            self.weight_relu.append(tf.Variable(init_trajectories[-1], dtype=tf.float32, trainable=True))
+            
+        # V neural network
+        self.weights_speed, self.biases_speed = self.initialize_neural_network(layers_speed, init_speed[0], init_speed[1], act="tanh")
         
         # Start a TF session
         self.sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True,
@@ -267,6 +282,15 @@ class NeuralNetwork():
             
         W, b = weights[-1], biases[-1]
         return tf.add(tf.matmul(H, W), b)
+    
+    def net_v(self, u):
+        return self.neural_network(u, self.weights_speed, 
+                                self.biases_speed, act=tf.nn.tanh)
+    
+    def net_F(self, u):
+        v = self.net_v(u)
+        v_rho = tf.gradients(v, u)[0]
+        return v + u*v_rho
 
     def net_u(self, x, t):
         '''
@@ -312,7 +336,7 @@ class NeuralNetwork():
         u_t = tf.gradients(u, t)[0]
         u_x = tf.gradients(u, x)[0]
         u_xx = tf.gradients(u_x, x)[0]
-        f = u_t + self.F(u) * u_x - self.gamma_var**2 * u_xx
+        f = u_t + self.net_F(u) * u_x - self.gamma_var**2 * u_xx
         return f
     
     def net_x(self, t):
@@ -341,11 +365,10 @@ class NeuralNetwork():
         
         x_trajectories = self.net_x(t) 
         g = []
-        for i in range(x_trajectories.shape[1]):
-            x = tf.slice(x_trajectories, [0,i], [-1,1])
-            x_t = tf.gradients(x, t)[0]
-            u = self.net_u(x, t)
-            g.append(x_t - self.V(u))
+        for i in range(len(x_trajectories)):
+            x_t = tf.gradients(x_trajectories[i], t[i])[0]
+            u = self.net_u(x_trajectories[i], t[i])
+            g.append(x_t - self.net_v(u))
         return g
 
     def loss_callback(self, MSEu, MSEf, MSEtrajectories, MSEg, total_loss, gamma):
