@@ -57,26 +57,17 @@ class ProbeVehicles:
         return self.sim.Vf*(1-z)
     
     def getMeasurements(self, z):
-        xMeasurements = np.empty((0, self.Nxi))
-        tMeasurements = []
-        zMeasurements = np.empty((0, self.Nxi))
+        xMeasurements = [np.empty((0, self.Nxi))]*self.Nxi
+        tMeasurements = [np.empty((0, self.Nxi))]*self.Nxi
+        zMeasurements = [np.empty((0, self.Nxi))]*self.Nxi
         for n in range(self.sim.Nt):
-            tMeasurements.append(n*self.sim.deltaT)
-            newLineX = np.empty((0, self.Nxi))
-            newLineZ = np.empty((0, self.Nxi))
             for j in range(self.Nxi):
                 if np.isnan(self.xiArray[j, n]) == False:
-                    newLineX = np.append(newLineX, self.xiArray[j,n])
-                    newLineZ = np.append(newLineZ, z[self.xi[j,n],n])
-                else:
-                    newLineX = np.append(newLineX, 0)
-                    newLineZ = np.append(newLineZ, 0)
-            newLineX = newLineX.reshape((1, self.Nxi))
-            newLineZ = newLineZ.reshape((1, self.Nxi))
-            xMeasurements = np.append(xMeasurements, newLineX, axis=0)
-            zMeasurements = np.append(zMeasurements, newLineZ, axis=0)
+                    tMeasurements[j] = np.append(tMeasurements[j], n*self.sim.deltaT)
+                    xMeasurements[j] = np.append(xMeasurements[j], self.xiArray[j,n])
+                    zMeasurements[j] = np.append(zMeasurements[j], z[self.xi[j,n],n])
                     
-        return (np.array(xMeasurements), np.array(tMeasurements), np.array(zMeasurements))
+        return (xMeasurements, tMeasurements, zMeasurements)
     
     def plot(self, t):
         it = np.round(np.arange(0, self.sim.Nt, self.sim.Nt/len(t))).astype(int)
