@@ -85,7 +85,7 @@ class ProbeVehicles:
             for n in self.xiT[j][0:-1]:
                 newDensity = z[self.xi[j][n],self.xiT[j][n]]
                 zMeasurements[j] = np.append(zMeasurements[j], newDensity)
-                vMeasurements[j] = np.append(vMeasurements[j], newDensity)
+                vMeasurements[j] = np.append(vMeasurements[j], self.speed(newDensity))
                     
         return (xMeasurements, tMeasurements, zMeasurements, vMeasurements)
     
