@@ -10,13 +10,31 @@ import matplotlib.pyplot as plt
 from scipy.stats import truncnorm
 from pyDOE import lhs
 
+    
+def flux(Vf, greenshield=True):
+       
+    if greenshield:
+        rhoc = 0.5
+        def f(rho):
+            return Vf*rho*(1-rho)
+    else: 
+        rhoc = 0.25
+        def f(rho):
+            if rho >= rhoc:
+                output = Vf*rho
+            else:
+                output = Vf*rhoc*(rho - 1)/(rhoc - 1)
+            return output           
+    return (f, rhoc)
+
 class PhysicsSim:
     
-    def __init__(self, L, Nx, Tmax, Vf=1, gamma=0.05):
+    def __init__(self, L, Nx, Tmax, Vf=1, gamma=0.05, greenshield=True):
         self.Nx = Nx
         self.L = L
         self.Tmax = Tmax
         self.update(Vf, gamma)
+        self.greenshield = greenshield
         
     def update(self, Vf, gamma):
         self.Vf = Vf
@@ -32,50 +50,67 @@ class ProbeVehicles:
     
     def __init__(self, sim, xiPos, xiT):
         self.sim = sim
-        self.xiPos = xiPos
-        self.xiT= xiT
         self.Nxi = len(xiPos)
-        self.xi = np.zeros((self.Nxi, self.sim.Nt))
-        self.xi[:,0] = self.xiPos*sim.Nx/sim.L
-        self.xi = np.array(self.xi, dtype=int)
-        self.xiArray = np.zeros((self.Nxi, sim.Nt))
-        for j in range(self.Nxi):
-            self.xiArray[j, 0] = self.xiPos[j]
+        self.xi = [np.array([xiPos[i]*sim.Nx/sim.L], dtype=int) for i in range(self.Nxi)]
+        self.xiT = [np.array([xiT[i]*sim.Nt/sim.Tmax], dtype=int) for i in range(self.Nxi)]
+        self.xiArray = [np.array([xiPos[i]]) for i in range(self.Nxi)]
+        self.xiTArray = [np.array([xiT[i]]) for i in range(self.Nxi)]
             
     def update(self, z, n):
         
         for j in range(self.Nxi): # ODE for the agents
-            if self.xi[j,n] >= self.sim.Nx or n*self.sim.deltaT < self.xiT[j]:
-                self.xiArray[j, n] = np.nan
+            if self.xi[j][-1] >= self.sim.Nx or n*self.sim.Tmax/self.sim.Nt < self.xiTArray[j][-1]:
                 continue
-            if (n-1)*self.sim.deltaT < self.xiT[j] and n*self.deltaT >= self.xiT[j]:
-                self.xiArray[j, n-1] = self.xiPos[j]
-            self.xiArray[j, n] = self.xiArray[j, n-1] + self.sim.deltaT*self.speed(z[self.xi[j,n-1]])
-            self.xi[j,n] = self.xiArray[j, n]*self.sim.Nx/self.sim.L
+            self.xiArray[j] = np.append(self.xiArray[j], self.xiArray[j][-1] + self.sim.deltaT*self.speed(z[self.xi[j][-1]]))
+            self.xiTArray[j] = np.append(self.xiTArray[j], n*self.sim.Tmax/self.sim.Nt)
+            
+            self.xi[j] = np.append(self.xi[j], int(self.xiArray[j][-1]*self.sim.Nx/self.sim.L))
+            self.xiT[j] = np.append(self.xiT[j], n)
             
     def speed(self, z):
-        return self.sim.Vf*(1-z)
+        if z > 0:
+            f,_ = flux(self.sim.Vf, greenshield=self.sim.greenshield)
+            return f(z)/z
+        else:
+            return self.sim.Vf
     
     def getMeasurements(self, z):
         xMeasurements = [np.empty((0, self.Nxi))]*self.Nxi
         tMeasurements = [np.empty((0, self.Nxi))]*self.Nxi
         zMeasurements = [np.empty((0, self.Nxi))]*self.Nxi
-        for n in range(self.sim.Nt):
-            for j in range(self.Nxi):
-                if np.isnan(self.xiArray[j, n]) == False:
-                    tMeasurements[j] = np.append(tMeasurements[j], n*self.sim.deltaT)
-                    xMeasurements[j] = np.append(xMeasurements[j], self.xiArray[j,n])
-                    zMeasurements[j] = np.append(zMeasurements[j], z[self.xi[j,n],n])
+        vMeasurements = [np.empty((0, self.Nxi))]*self.Nxi
+        for j in range(self.Nxi):
+            tMeasurements[j] = self.xiTArray[j][0:-1]
+            xMeasurements[j] = self.xiArray[j][0:-1]
+            for n in self.xiT[j][0:-1]:
+                newDensity = z[self.xi[j][n],self.xiT[j][n]]
+                zMeasurements[j] = np.append(zMeasurements[j], newDensity)
+                vMeasurements[j] = np.append(vMeasurements[j], newDensity)
                     
-        return (xMeasurements, tMeasurements, zMeasurements)
+        return (xMeasurements, tMeasurements, zMeasurements, vMeasurements)
+    
+    # def getMeasurements(self, z):
+    #     xMeasurements = [np.empty((0, self.Nxi))]*self.Nxi
+    #     tMeasurements = [np.empty((0, self.Nxi))]*self.Nxi
+    #     zMeasurements = [np.empty((0, self.Nxi))]*self.Nxi
+    #     vMeasurements = [np.empty((0, self.Nxi))]*self.Nxi
+    #     for n in range(self.sim.Nt):
+    #         for j in range(self.Nxi):
+    #             if np.isnan(self.xiArray[j, n]) == False:
+    #                 tMeasurements[j] = np.append(tMeasurements[j], n*self.sim.deltaT)
+    #                 xMeasurements[j] = np.append(xMeasurements[j], self.xiArray[j,n])
+    #                 zMeasurements[j] = np.append(zMeasurements[j], z[self.xi[j,n],n])
+    #                 vMeasurements[j] = np.append(vMeasurements[j], self.speed(z[self.xi[j,n],n]))
+                    
+    #     return (xMeasurements, tMeasurements, zMeasurements, vMeasurements)
     
     def plot(self, t):
-        it = np.round(np.arange(0, self.sim.Nt, self.sim.Nt/len(t))).astype(int)
-        xiArrayPlot = self.xiArray[:, it]
-        x = xiArrayPlot
+        # it = np.round(np.arange(0, self.sim.Nt, self.sim.Nt/len(t))).astype(int)
+        # xiArrayPlot = self.xiArray[:, it]
+        # x = xiArrayPlot
         
-        for i in range(self.Nxi):
-            plt.plot(t, x[i, :], color='red')
+        for j in range(self.Nxi):
+            plt.plot(self.xiTArray[j], self.xiArray[j], color='red')
         
 
 class BoundaryConditions:
@@ -192,9 +227,9 @@ class BoundaryConditions:
     
 class SimuGodunov:
 
-    def __init__(self, Vf, gamma, xiPos, xiT, zMin=0, zMax=1, L=5, Tmax=3, Nx = 300, rhoBar=-1, rhoSigma=0):
+    def __init__(self, Vf, gamma, xiPos, xiT, zMin=0, zMax=1, L=5, Tmax=3, Nx = 300, rhoBar=-1, rhoSigma=0, greenshield=True):
         
-        self.sim = PhysicsSim(L, Nx, Tmax, Vf, gamma)
+        self.sim = PhysicsSim(L, Nx, Tmax, Vf, gamma, greenshield)
         
         bc = BoundaryConditions(self.sim, zMin, zMax, rhoBar, rhoSigma)
         self.z0 = bc.getZ0()
@@ -208,8 +243,7 @@ class SimuGodunov:
         
     def g(self, u, v):
     
-        f = lambda x: self.sim.Vf*x*(1-x)
-        rhoc = 1/2;
+        f, rhoc = flux(self.sim.Vf, greenshield=self.sim.greenshield)
         
         if u < 0: 
             u = 0;
@@ -285,8 +319,8 @@ class SimuGodunov:
         plt.pcolor(X, Y, z, shading='auto', vmin=0.0, vmax=1.0, rasterized=True)
         plt.xlabel(r'Time [s]')
         plt.ylabel(r'Position [m]')
-        #plt.xlim(0, self.sim.Tmax)
-        #plt.ylim(0, self.sim.L)
+        plt.xlim(0, self.sim.Tmax)
+        plt.ylim(0, self.sim.L)
         plt.colorbar()
         plt.tight_layout()
         self.pv.plot(self.t)
