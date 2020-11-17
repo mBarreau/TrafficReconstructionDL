@@ -377,17 +377,17 @@ class SimuGodunov:
         
             t = t.reshape(Nt, 1) 
             nPackets = int(np.ceil(Nt/totalPacket))
+            toBeSelected = np.empty((0,1), dtype=np.int)
+            for i in range(nPackets):
+                randomPackets = np.arange(i*totalPacket, min((i+1)*totalPacket, Nt), dtype=np.int)
+                np.random.shuffle(randomPackets)
+                if selectedPacket > randomPackets.shape[0]:
+                    toBeSelected = np.append(toBeSelected, randomPackets[0:-1])
+                else:
+                    toBeSelected = np.append(toBeSelected, randomPackets[0:selectedPacket])
+            toBeSelected = np.sort(toBeSelected)
+            
             for k in range(Nxi):
-                toBeSelected = np.empty((0,1), dtype=np.int)
-                for i in range(nPackets):
-                    randomPackets = np.arange(i*totalPacket, min((i+1)*totalPacket, Nt), dtype=np.int)
-                    np.random.shuffle(randomPackets)
-                    if selectedPacket > randomPackets.shape[0]:
-                        toBeSelected = np.append(toBeSelected, randomPackets[0:-1])
-                    else:
-                        toBeSelected = np.append(toBeSelected, randomPackets[0:selectedPacket])
-                    
-                toBeSelected = np.sort(toBeSelected)    
                 try:
                     x_selected = np.append(x_selected, np.reshape(x_true[toBeSelected, k], [-1,1]), axis=1)
                     rho_selected = np.append(rho_selected, np.reshape(rho_true[toBeSelected, k], [-1,1]), axis=1)
@@ -397,7 +397,6 @@ class SimuGodunov:
                     rho_selected = np.reshape(rho_true[toBeSelected, 0], [-1,1])
             Nt2 = toBeSelected.shape[0]
             N = Nt2*Nxi
-                
     
         if noise:
             noise_trajectory = np.random.normal(0, 2, N)

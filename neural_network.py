@@ -113,7 +113,7 @@ class NeuralNetwork():
         
         # Start a TF session
         self.sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True,
-                                                     log_device_placement=True))
+                                                     log_device_placement=False))
 
         # PDE part
         self.x_tf = [tf.placeholder(tf.float32, shape=[None, 1]) for _ in range(self.N)]
