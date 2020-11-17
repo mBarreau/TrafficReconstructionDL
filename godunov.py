@@ -20,11 +20,7 @@ def flux(Vf, greenshield=True):
     else: 
         rhoc = 0.25
         def f(rho):
-            if rho >= rhoc:
-                output = Vf*rho
-            else:
-                output = Vf*rhoc*(rho - 1)/(rhoc - 1)
-            return output           
+            return Vf*rho*(rho <= rhoc) + Vf*rhoc*(rho - 1)/(rhoc - 1)*(rho > rhoc)           
     return (f, rhoc)
 
 class PhysicsSim:
@@ -50,67 +46,59 @@ class ProbeVehicles:
     
     def __init__(self, sim, xiPos, xiT):
         self.sim = sim
+        self.xiPos = xiPos
+        self.xiT= xiT
         self.Nxi = len(xiPos)
-        self.xi = [np.array([xiPos[i]*sim.Nx/sim.L], dtype=int) for i in range(self.Nxi)]
-        self.xiT = [np.array([xiT[i]*sim.Nt/sim.Tmax], dtype=int) for i in range(self.Nxi)]
-        self.xiArray = [np.array([xiPos[i]]) for i in range(self.Nxi)]
-        self.xiTArray = [np.array([xiT[i]]) for i in range(self.Nxi)]
+        self.xi = np.zeros((self.Nxi, self.sim.Nt))
+        self.xi[:,0] = self.xiPos*sim.Nx/sim.L
+        self.xi = np.array(self.xi, dtype=int)
+        self.xiArray = np.zeros((self.Nxi, sim.Nt))
+        for j in range(self.Nxi):
+            self.xiArray[j, 0] = self.xiPos[j]
             
     def update(self, z, n):
         
         for j in range(self.Nxi): # ODE for the agents
-            if self.xi[j][-1] >= self.sim.Nx or n*self.sim.Tmax/self.sim.Nt < self.xiTArray[j][-1]:
+            if self.xi[j,n] >= self.sim.Nx or n*self.sim.deltaT < self.xiT[j]:
+                self.xiArray[j, n] = np.nan
                 continue
-            self.xiArray[j] = np.append(self.xiArray[j], self.xiArray[j][-1] + self.sim.deltaT*self.speed(z[self.xi[j][-1]]))
-            self.xiTArray[j] = np.append(self.xiTArray[j], n*self.sim.Tmax/self.sim.Nt)
-            
-            self.xi[j] = np.append(self.xi[j], int(self.xiArray[j][-1]*self.sim.Nx/self.sim.L))
-            self.xiT[j] = np.append(self.xiT[j], n)
+            if (n-1)*self.sim.deltaT < self.xiT[j] and n*self.deltaT >= self.xiT[j]:
+                self.xiArray[j, n-1] = self.xiPos[j]
+            self.xiArray[j, n] = self.xiArray[j, n-1] + self.sim.deltaT*self.speed(z[self.xi[j,n-1]])
+            self.xi[j,n] = self.xiArray[j, n]*self.sim.Nx/self.sim.L
             
     def speed(self, z):
-        if z > 0:
-            f,_ = flux(self.sim.Vf, greenshield=self.sim.greenshield)
-            return f(z)/z
-        else:
-            return self.sim.Vf
+        return self.sim.Vf*(1-z)
     
     def getMeasurements(self, z):
-        xMeasurements = [np.empty((0, self.Nxi))]*self.Nxi
-        tMeasurements = [np.empty((0, self.Nxi))]*self.Nxi
-        zMeasurements = [np.empty((0, self.Nxi))]*self.Nxi
-        vMeasurements = [np.empty((0, self.Nxi))]*self.Nxi
-        for j in range(self.Nxi):
-            tMeasurements[j] = self.xiTArray[j][0:-1]
-            xMeasurements[j] = self.xiArray[j][0:-1]
-            for n in self.xiT[j][0:-1]:
-                newDensity = z[self.xi[j][n],self.xiT[j][n]]
-                zMeasurements[j] = np.append(zMeasurements[j], newDensity)
-                vMeasurements[j] = np.append(vMeasurements[j], self.speed(newDensity))
+        xMeasurements = np.empty((0, self.Nxi))
+        tMeasurements = []
+        zMeasurements = np.empty((0, self.Nxi))
+        for n in range(self.sim.Nt):
+            tMeasurements.append(n*self.sim.deltaT)
+            newLineX = np.empty((0, self.Nxi))
+            newLineZ = np.empty((0, self.Nxi))
+            for j in range(self.Nxi):
+                if np.isnan(self.xiArray[j, n]) == False:
+                    newLineX = np.append(newLineX, self.xiArray[j,n])
+                    newLineZ = np.append(newLineZ, z[self.xi[j,n],n])
+                else:
+                    newLineX = np.append(newLineX, 0)
+                    newLineZ = np.append(newLineZ, 0)
+            newLineX = newLineX.reshape((1, self.Nxi))
+            newLineZ = newLineZ.reshape((1, self.Nxi))
+            xMeasurements = np.append(xMeasurements, newLineX, axis=0)
+            zMeasurements = np.append(zMeasurements, newLineZ, axis=0)
                     
-        return (xMeasurements, tMeasurements, zMeasurements, vMeasurements)
-    
-    # def getMeasurements(self, z):
-    #     xMeasurements = [np.empty((0, self.Nxi))]*self.Nxi
-    #     tMeasurements = [np.empty((0, self.Nxi))]*self.Nxi
-    #     zMeasurements = [np.empty((0, self.Nxi))]*self.Nxi
-    #     vMeasurements = [np.empty((0, self.Nxi))]*self.Nxi
-    #     for n in range(self.sim.Nt):
-    #         for j in range(self.Nxi):
-    #             if np.isnan(self.xiArray[j, n]) == False:
-    #                 tMeasurements[j] = np.append(tMeasurements[j], n*self.sim.deltaT)
-    #                 xMeasurements[j] = np.append(xMeasurements[j], self.xiArray[j,n])
-    #                 zMeasurements[j] = np.append(zMeasurements[j], z[self.xi[j,n],n])
-    #                 vMeasurements[j] = np.append(vMeasurements[j], self.speed(z[self.xi[j,n],n]))
-                    
-    #     return (xMeasurements, tMeasurements, zMeasurements, vMeasurements)
+        return (np.array(xMeasurements), np.array(tMeasurements), np.array(zMeasurements))
     
     def plot(self, t):
-        # it = np.round(np.arange(0, self.sim.Nt, self.sim.Nt/len(t))).astype(int)
-        # xiArrayPlot = self.xiArray[:, it]
-        # x = xiArrayPlot
+        it = np.round(np.arange(0, self.sim.Nt, self.sim.Nt/len(t))).astype(int)
+        xiArrayPlot = self.xiArray[:, it]
+        x = xiArrayPlot
         
-        for j in range(self.Nxi):
-            plt.plot(self.xiTArray[j], self.xiArray[j], color='red')
+        for i in range(self.Nxi):
+            plt.plot(t, x[i, :], color='red')
         
 
 class BoundaryConditions:
@@ -326,14 +314,103 @@ class SimuGodunov:
         self.pv.plot(self.t)
         plt.show()
         fig.savefig('density.eps', bbox_inches='tight')
-        
-    def getMeasurements(self):
-        return self.pv.getMeasurements(self.z)
     
     def getDatas(self, x, t):
         X = (x/self.sim.deltaX).astype(int)
         T = (t/self.sim.deltaT).astype(int)
         return self.z[X, T]
+    
+    def getMeasurements(self, L=-1, Tmax=-1, selectedPacket=-1, totalPacket=-1, noise=False):
+        '''
+        Collect data from the probe vehicles
+        Parameters
+        ----------
+        L : float64, optional
+            Space-length of the domain. Used only if L and Tmax are strictly 
+            positive. 
+            The default is -1.
+        Tmax : float64, optional
+            Time-length of the domain. Used only if L and Tmax are strictly 
+            positive. 
+            The default is -1.
+        selectedPacket : float64, optional
+            Number of measurements per packet selected. If -1 then all 
+            the measurements are used. 
+            If a real number between [0, 1], this is the fraction of used 
+            measurements.
+            Otherwise, it is the number of measurements used within a packet. 
+            It must be an integer less than totalPacket. 
+            The default is -1.
+        totalPacket : integer, optional
+            Length of a packet. If -1, there is only one packet.
+            The default is -1.
+        noise : boolean, optional
+            If True, noise is added on the measurements. The default is False.
+        Returns
+        -------
+        x : 2D numpy array of shape (?, N)
+            space coordinate of the measurements.
+        t_selected : 1D numpy array f shape (?, 1)
+            time coordinate of the measurements.
+        rho_meas : 2D numpy array of shape (?, N)
+            density measurements.
+        '''
+        if L > 0 and Tmax > 0:
+            N = 1000
+            x_true = np.random.rand(N,1)*L
+            t = np.random.rand(N,1)*Tmax
+            Nt = t.shape[0]
+            rho_true = self.getDatas(x_true, t)
+            Nxi = 1
+        else:
+            x_true, t, rho_true = self.pv.getMeasurements(self.z)
+            Nt = t.shape[0]
+            Nxi = x_true.shape[-1]
+            N = Nt * Nxi
+            
+            if totalPacket == -1:
+                totalPacket = Nt
+            if selectedPacket <= 0:
+                selectedPacket = totalPacket
+            elif selectedPacket < 1:
+                selectedPacket = int(np.ceil(totalPacket*selectedPacket))
+        
+            t = t.reshape(Nt, 1) 
+            nPackets = int(np.ceil(Nt/totalPacket))
+            for k in range(Nxi):
+                toBeSelected = np.empty((0,1), dtype=np.int)
+                for i in range(nPackets):
+                    randomPackets = np.arange(i*totalPacket, min((i+1)*totalPacket, Nt), dtype=np.int)
+                    np.random.shuffle(randomPackets)
+                    if selectedPacket > randomPackets.shape[0]:
+                        toBeSelected = np.append(toBeSelected, randomPackets[0:-1])
+                    else:
+                        toBeSelected = np.append(toBeSelected, randomPackets[0:selectedPacket])
+                    
+                toBeSelected = np.sort(toBeSelected)    
+                try:
+                    x_selected = np.append(x_selected, np.reshape(x_true[toBeSelected, k], [-1,1]), axis=1)
+                    rho_selected = np.append(rho_selected, np.reshape(rho_true[toBeSelected, k], [-1,1]), axis=1)
+                except NameError:
+                    x_selected = np.reshape(x_true[toBeSelected, 0], [-1,1])
+                    t_selected = t[toBeSelected]
+                    rho_selected = np.reshape(rho_true[toBeSelected, 0], [-1,1])
+            Nt2 = toBeSelected.shape[0]
+            N = Nt2*Nxi
+                
+    
+        if noise:
+            noise_trajectory = np.random.normal(0, 2, N)
+            if L > 0 and Tmax > 0:
+                noise_trajectory = np.cumsum(noise_trajectory.reshape(Nt2, Nxi), axis=0)
+            x = x_selected + noise_trajectory
+            rho_meas = rho_selected + np.random.normal(0.1, 0.2, N).reshape(Nt2, Nxi)
+            rho_meas = np.maximum(np.minimum(rho_meas, 1), 0)
+        else:
+            x = x_selected
+            rho_meas = rho_selected
+    
+        return x, t_selected, rho_meas
     
     def getPrediction(self, tf, Nexp=10, wMax=30, Amax=1, Amin=0): 
         Nplus = int((tf-self.sim.Tmax)/self.sim.deltaT) 
