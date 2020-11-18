@@ -232,9 +232,7 @@ class ReconstructionNeuralNetwork():
         plt.colorbar()
         plt.tight_layout()
         # plt.title('Reconstruction')
-        plt.show()
         figReconstruction.savefig('reconstruction.eps', bbox_inches='tight')
-        
         
         figError = plt.figure(figsize=(7.5, 5))
         X, Y = np.meshgrid(t, x)
@@ -248,7 +246,6 @@ class ReconstructionNeuralNetwork():
         plt.colorbar()
         plt.tight_layout()
         # plt.title('Absolute error')
-        plt.show()
         figError.savefig('error.eps', bbox_inches='tight') 
         
         return [figReconstruction, figError]

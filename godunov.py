@@ -295,7 +295,6 @@ class SimuGodunov:
         plt.colorbar()
         plt.tight_layout()
         self.pv.plot()
-        plt.show()
         fig.savefig('density.eps', bbox_inches='tight')
     
     def getDatas(self, x, t):
@@ -374,7 +373,7 @@ class SimuGodunov:
             rho_selected.append(np.reshape(np.maximum(np.minimum(rho_temp, 1), 0), (-1,1)))
             t_selected.append(np.reshape(t[k][toBeSelected], (-1,1)))
     
-        return t_selected, x_selected, rho_selected
+        return x_selected, t_selected, rho_selected
     
     def getPrediction(self, tf, Nexp=10, wMax=30, Amax=1, Amin=0): 
         Nplus = int((tf-self.sim.Tmax)/self.sim.deltaT) 
