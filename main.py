@@ -6,11 +6,12 @@ Created on Mon Sep 14 15:17:25 2020
 """
 
 import numpy as np
-np.random.seed(12345)
+# np.random.seed(12345)
 import godunov as g
 import reconstruction_neural_network as rn
 import matplotlib.pyplot as plt
 from pyDOE import lhs
+import csv
 
 #####################################
 ####     General parameters     #####
@@ -35,29 +36,36 @@ Ltotal = L + Lplus
 Ncar = rhoBar*rhoMax*Ltotal/1000 # Number of cars
 Npv = int(Ncar*p) # Number of PV
 
-# Initial position and time of probes vehicles
-xiPos = L*lhs(1, samples=Npv).reshape((Npv,))
-xiPos = np.flip(np.sort(xiPos))
-xiT = np.array([0]*Npv)
+for i in range(10):
+    print("******** SIMULATION %.0f ********" % (i+1))
 
-# Godunov simulation of the PDE
-simu_godunov = g.SimuGodunov(Vf, gamma, xiPos, xiT, L=Ltotal, Tmax=Tmax,
-                             zMin=0, zMax=1, Nx=1000, rhoBar=rhoBar, rhoSigma=rhoSigma)
-rho = simu_godunov.simulation()
-simu_godunov.plot()
-axisPlot = simu_godunov.getAxisPlot()
+    # Initial position and time of probes vehicles
+    xiPos = L*lhs(1, samples=Npv).reshape((Npv,))
+    xiPos = np.flip(np.sort(xiPos))
+    xiT = np.array([0]*Npv)
 
-# collect data from PV
-x_train, t_train, rho_train = simu_godunov.getMeasurements(selectedPacket=-1, 
-                                                           totalPacket=-1, 
-                                                           noise=noise)
+    # Godunov simulation of the PDE
+    simu_godunov = g.SimuGodunov(Vf, gamma, xiPos, xiT, L=Ltotal, Tmax=Tmax, zMin=0, zMax=1, Nx=1000, rhoBar=rhoBar, rhoSigma=rhoSigma)
+    rho = simu_godunov.simulation()
+    simu_godunov.plot()
+    axisPlot = simu_godunov.getAxisPlot()
 
-trained_neural_network = rn.ReconstructionNeuralNetwork(x_train, t_train, rho_train, 
-                                                    Ltotal, Tmax, V, F, 
-                                                    N_f=7500, N_g=150)
+    # collect data from PV
+    x_train, t_train, rho_train = simu_godunov.getMeasurements(selectedPacket=-1,
+                                                               totalPacket=-1,
+                                                               noise=noise)
 
-[_, figError] = trained_neural_network.plot(axisPlot, rho)
+    trained_neural_network = rn.ReconstructionNeuralNetwork(x_train, t_train, rho_train,
+                                                        Ltotal, Tmax, V, F,
+                                                        N_f=7500, N_g=150)
+    # [_, figError] = trained_neural_network.plot(axisPlot, rho)
+    L2_error = trained_neural_network.plot(axisPlot, rho)
+
+    with open('error_statistics.csv', 'a', newline='', encoding='utf-8') as file:
+        w = csv.writer(file)
+        w.writerow([L2_error])
+
 simu_godunov.pv.plot()
-figError.savefig('error.eps', bbox_inches='tight')
-plt.show()
 
+# figError.savefig('error.eps', bbox_inches='tight')
+# plt.show()

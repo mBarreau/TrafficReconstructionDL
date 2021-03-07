@@ -54,19 +54,26 @@ class ReconstructionNeuralNetwork():
         
         self.Nxi = len(x) # Number of agents
         
-        num_hidden_layers = int(Tmax*8/100) 
-        num_nodes_per_layer = int(20*L/7000) 
+        num_hidden_layers = int(Tmax*8/100)
+        num_nodes_per_layer = int(20*L/5000)
         layers = [2] # There are two inputs: space and time
         for _ in range(num_hidden_layers):
             layers.append(num_nodes_per_layer)
         layers.append(1)
-        
+
+        num_hidden_layers = 3
+        num_nodes_per_layer = 5
+        trajectory_layers = [1]
+        for _ in range(num_hidden_layers):
+            trajectory_layers.append(num_nodes_per_layer)
+        trajectory_layers.append(1)
+
         x_train, t_train, u_train, X_f_train, t_g_train = self.createTrainingDataset(x, t, rho, L, Tmax, N_f, N_g) # Creation of standardized training dataset
         V_standard = lambda u: V((u+1)/2)*(self.ub[1] - self.lb[1]) / (self.ub[0] - self.lb[0]) # Standardized velocity function
         F_standard = lambda u: F((u+1)/2)*(self.ub[1] - self.lb[1]) / (self.ub[0] - self.lb[0]) # Standardized flux function
         
         self.neural_network = NeuralNetwork(x_train, t_train, u_train, X_f_train, t_g_train, layers_density=layers, 
-                                              layers_trajectories=(1, 5, 5, 5, 1),
+                                              layers_trajectories=trajectory_layers,
                                               V=V_standard, F=F_standard) # Creation of the neural network
         self.train() # Training of the neural network
             
@@ -181,8 +188,7 @@ class ReconstructionNeuralNetwork():
         output = self.neural_network.predict_trajectories(t)
         output = [(output[i]+1)*(self.ub[0] - self.lb[0])/2 + self.lb[0] for i in range(self.Nxi)]
         return output
-    
-    
+
     def plot(self, axisPlot, rho):
         '''
         
@@ -215,8 +221,10 @@ class ReconstructionNeuralNetwork():
                 k = k + 1
         xstar = XY_prediction[:, 0:1]
         tstar = XY_prediction[:, 1:2]
-        
+
         rho_prediction = self.predict(xstar, tstar).reshape(Nx, Nt)
+
+        """
         t_pred = [t.reshape(t.shape[0], 1)]*self.Nxi
         X_prediction = self.predict_trajectories(t_pred)
 
@@ -246,6 +254,11 @@ class ReconstructionNeuralNetwork():
         plt.colorbar()
         plt.tight_layout()
         # plt.title('Absolute error')
-        figError.savefig('error.eps', bbox_inches='tight') 
+        figError.savefig('error.eps', bbox_inches='tight')
+        """
+
+        L2_error = np.mean(np.square(rho_prediction - rho))
+        print("Normalized L^2 error: ", L2_error)
         
-        return [figReconstruction, figError]
+        # return [figReconstruction, figError]
+        return L2_error
