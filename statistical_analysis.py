@@ -1,5 +1,6 @@
 import csv
 import numpy as np
+import matplotlib.pyplot as plt
 
 error_list = []
 with open('error_statistics.csv', 'r', newline='', encoding='utf-8') as file:
@@ -8,6 +9,9 @@ with open('error_statistics.csv', 'r', newline='', encoding='utf-8') as file:
         error_list.append(float(e[0]))
 print('Mean L2-error: ', np.mean(error_list))
 print('Standard deviation L2-error: ', np.std(error_list))
+
+plt.boxplot(error_list)
+plt.show()
 
 
 
