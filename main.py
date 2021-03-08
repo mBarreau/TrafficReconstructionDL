@@ -36,7 +36,7 @@ Ltotal = L + Lplus
 Ncar = rhoBar*rhoMax*Ltotal/1000 # Number of cars
 Npv = int(Ncar*p) # Number of PV
 
-for i in range(1):
+for i in range(50):
     print("******** SIMULATION %.0f ********" % (i+1))
 
     # Initial position and time of probes vehicles
@@ -61,7 +61,7 @@ for i in range(1):
     # [_, figError] = trained_neural_network.plot(axisPlot, rho)
     L2_error = trained_neural_network.plot(axisPlot, rho)
 
-    with open('error_statistics.csv', 'a', newline='', encoding='utf-8') as file:
+    with open('error_BFGS.csv', 'a', newline='', encoding='utf-8') as file:
         w = csv.writer(file)
         w.writerow([L2_error])
 
