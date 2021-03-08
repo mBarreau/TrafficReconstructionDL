@@ -36,7 +36,7 @@ Ltotal = L + Lplus
 Ncar = rhoBar*rhoMax*Ltotal/1000 # Number of cars
 Npv = int(Ncar*p) # Number of PV
 
-for i in range(10):
+for i in range(1):
     print("******** SIMULATION %.0f ********" % (i+1))
 
     # Initial position and time of probes vehicles
