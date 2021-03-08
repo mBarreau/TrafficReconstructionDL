@@ -18,9 +18,12 @@ error1 = get_error('error_L4DC.csv')
 print('\nEqual loss weights, BFGS:')
 error2 = get_error('error_BFGS.csv')
 
+fig = plt.figure()
 data = [error1, error2]
 plt.boxplot(data)
 plt.xticks([1, 2], ['L4DC algorithm', 'Equal loss weights, BFGS'])
+
+fig.savefig('boxplot.eps', bbox_inches='tight')
 plt.show()
 
 
