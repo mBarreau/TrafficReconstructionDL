@@ -36,8 +36,6 @@ plt.xticks([1, 2], ['L4DC algorithm', 'Equal loss weights, BFGS'])
 figError.savefig('boxplot.eps', bbox_inches='tight')
 figTime.savefig('computation_time.eps', bbox_inches='tight')
 
-plt.figure()
-plt.plot(time2)
 plt.show()
 
 
