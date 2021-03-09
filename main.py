@@ -36,8 +36,10 @@ Ltotal = L + Lplus
 Ncar = rhoBar*rhoMax*Ltotal/1000 # Number of cars
 Npv = int(Ncar*p) # Number of PV
 
-for i in range(50):
+for i in range(20):
     print("******** SIMULATION %.0f ********" % (i+1))
+
+    plt.close('all')
 
     # Initial position and time of probes vehicles
     xiPos = L*lhs(1, samples=Npv).reshape((Npv,))
@@ -59,11 +61,16 @@ for i in range(50):
                                                         Ltotal, Tmax, V, F,
                                                         N_f=7500, N_g=150)
     # [_, figError] = trained_neural_network.plot(axisPlot, rho)
-    L2_error = trained_neural_network.plot(axisPlot, rho)
+    L2_error, computation_time = trained_neural_network.plot(axisPlot, rho)
 
-    with open('error_BFGS.csv', 'a', newline='', encoding='utf-8') as file:
+    # with open('error_BFGS.csv', 'a', newline='', encoding='utf-8') as file:
+    #     w = csv.writer(file)
+    #     w.writerow([L2_error])
+
+    with open('computation_time_L4DC.csv', 'a', newline='', encoding='utf-8') as file:
         w = csv.writer(file)
-        w.writerow([L2_error])
+        w.writerow([computation_time])
+
 
 simu_godunov.pv.plot()
 

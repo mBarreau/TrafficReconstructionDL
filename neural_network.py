@@ -149,38 +149,31 @@ class NeuralNetwork():
         self.loss_trajectories = self.MSEtrajectories + 0*self.MSEg
         self.loss = self.MSEu + 0.1*self.MSEf + 0.5*self.MSEtrajectories + 0.1*self.MSEg
         self.loss_precise = self.MSEu + self.MSEf + self.MSEtrajectories + 0.5*self.MSEg + 0.1*tf.square(self.gamma_var)
-
-        self.loss = self.MSEu + self.MSEf + self.MSEtrajectories + self.MSEg + tf.square(self.gamma_var)
         
         # Definition of the training procedure
         self.optimizer = []
-        # self.optimizer.append(OptimizationProcedure(self, self.loss_trajectories, 100, {'maxiter': 500,
-        #                                                                   'maxfun': 5000,
-        #                                                                   'maxcor': 50,
-        #                                                                   'maxls': 50,
-        #                                                                   'ftol': 5.0 * np.finfo(float).eps}))
-        # self.optimizer.append(OptimizationProcedure(self, self.MSEg, 100, {'maxiter': 500,
-        #                                                                   'maxfun': 5000,
-        #                                                                   'maxcor': 50,
-        #                                                                   'maxls': 50,
-        #                                                                   'ftol': 5.0 * np.finfo(float).eps},
-        #                                             var_list=list_var_density))
-        # self.optimizer.append(OptimizationProcedure(self, self.loss, 1000, {'maxiter': 4000,
-        #                                                                   'maxfun': 5000,
-        #                                                                   'maxcor': 50,
-        #                                                                   'maxls': 20,
-        #                                                                   'ftol': 5.0 * np.finfo(float).eps},
-        #                                             var_list=list_var_density))
-        # self.optimizer.append(OptimizationProcedure(self, self.loss_precise, 0, {'maxiter': 10000,
-        #                                                                   'maxfun': 50000,
-        #                                                                   'maxcor': 150,
-        #                                                                   'maxls': 75,
-        #                                                                   'ftol': 1.0 * np.finfo(float).eps}))
-        self.optimizer.append(OptimizationProcedure(self, self.loss, 0, {'maxiter': 10000,
-                                                                                 'maxfun': 50000,
-                                                                                 'maxcor': 150,
-                                                                                 'maxls': 75,
-                                                                                 'ftol': 1.0 * np.finfo(float).eps}))
+        self.optimizer.append(OptimizationProcedure(self, self.loss_trajectories, 100, {'maxiter': 500,
+                                                                          'maxfun': 5000,
+                                                                          'maxcor': 50,
+                                                                          'maxls': 50,
+                                                                          'ftol': 5.0 * np.finfo(float).eps}))
+        self.optimizer.append(OptimizationProcedure(self, self.MSEg, 100, {'maxiter': 500,
+                                                                          'maxfun': 5000,
+                                                                          'maxcor': 50,
+                                                                          'maxls': 50,
+                                                                          'ftol': 5.0 * np.finfo(float).eps},
+                                                    var_list=list_var_density))
+        self.optimizer.append(OptimizationProcedure(self, self.loss, 1000, {'maxiter': 4000,
+                                                                          'maxfun': 5000,
+                                                                          'maxcor': 50,
+                                                                          'maxls': 20,
+                                                                          'ftol': 5.0 * np.finfo(float).eps},
+                                                    var_list=list_var_density))
+        self.optimizer.append(OptimizationProcedure(self, self.loss_precise, 0, {'maxiter': 10000,
+                                                                          'maxfun': 50000,
+                                                                          'maxcor': 150,
+                                                                          'maxls': 75,
+                                                                          'ftol': 1.0 * np.finfo(float).eps}))
 
         # Initialize the TF session
         init = tf.global_variables_initializer() 
