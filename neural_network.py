@@ -59,6 +59,8 @@ class NeuralNetwork():
 
         '''
 
+        tf.reset_default_graph()
+
         self.x = x 
         self.t = t
         self.u = u
@@ -163,7 +165,7 @@ class NeuralNetwork():
                                                                           'maxfun': 5000,
                                                                           'maxcor': 50,
                                                                           'maxls': 20,
-                                                                          'ftol': 5.0 * np.finfo(float).eps}, 
+                                                                          'ftol': 5.0 * np.finfo(float).eps},
                                                     var_list=list_var_density))
         self.optimizer.append(OptimizationProcedure(self, self.loss_precise, 0, {'maxiter': 10000,
                                                                           'maxfun': 50000,

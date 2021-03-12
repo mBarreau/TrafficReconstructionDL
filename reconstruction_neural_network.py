@@ -53,7 +53,7 @@ class ReconstructionNeuralNetwork():
         '''
         
         self.Nxi = len(x) # Number of agents
-        
+
         num_hidden_layers = int(Tmax*8/100)
         num_nodes_per_layer = int(20*L/5000)
         layers = [2] # There are two inputs: space and time
@@ -75,7 +75,9 @@ class ReconstructionNeuralNetwork():
         self.neural_network = NeuralNetwork(x_train, t_train, u_train, X_f_train, t_g_train, layers_density=layers, 
                                               layers_trajectories=trajectory_layers,
                                               V=V_standard, F=F_standard) # Creation of the neural network
-        self.train() # Training of the neural network
+
+        self.computation_time = 0
+        self.computation_time = self.train()  # Training of the neural network
             
     def createTrainingDataset(self, x, t, rho, L, Tmax, N_f, N_g):       
         '''
@@ -142,7 +144,9 @@ class ReconstructionNeuralNetwork():
         '''
         start = time()
         self.neural_network.train()
-        hms(time() - start)
+        computation_time = time() - start  # in seconds
+        hms(computation_time)
+        return computation_time
         
     def predict(self, x, t):
         '''
@@ -261,4 +265,4 @@ class ReconstructionNeuralNetwork():
         print("Normalized L^2 error: ", L2_error)
         
         # return [figReconstruction, figError]
-        return L2_error
+        return L2_error, self.computation_time
