@@ -122,7 +122,8 @@ class NeuralNetwork():
         self.x_f_tf = tf.placeholder(tf.float32, shape=[None, self.x_f.shape[1]])
         self.t_f_tf = tf.placeholder(tf.float32, shape=[None, self.t_f.shape[1]])
         
-        self.u_pred = [self.net_u(self.net_x_pv(self.t_tf[i], i), self.t_tf[i]) for i in range(self.N)] 
+        self.u_pred = [self.net_u(self.t_tf[i], self.net_x_pv(self.t_tf[i], i)) - self.noise_rho_bar[i]
+                       for i in range(self.N)] 
         self.f_pred = self.net_f(self.x_f_tf, self.t_f_tf)        
         
         # Agents part
@@ -132,17 +133,14 @@ class NeuralNetwork():
         self.g_pred = self.net_g(self.t_g_tf)
 
         # MSE part
-        self.MSEu = 0
-        for i in range(self.N):
-            self.MSEu = self.MSEu + tf.reduce_mean(tf.square(self.u_tf[i] - self.u_pred[i] - self.noise_rho_bar[i]))/self.N
+        self.MSEu = tf.reduce_mean(tf.square(tf.concat(self.u_tf, 0)
+                                              - tf.concat(self.u_pred, 0)))
         
         self.MSEf = tf.reduce_mean(tf.square(self.f_pred))
         
-        self.MSEtrajectories = 0
-        self.MSEg = 0
-        for i in range(self.N):
-            self.MSEtrajectories = self.MSEtrajectories + tf.reduce_mean(tf.square(self.x_tf[i] - self.x_pred[i]))/self.N
-            self.MSEg = self.MSEg + tf.reduce_mean(tf.square(self.g_pred[i]))/self.N
+        self.MSEtrajectories = tf.reduce_mean(tf.square(tf.concat(self.x_tf, 0)
+                                                        - tf.concat(self.x_pred, 0)))
+        self.MSEg = tf.reduce_mean(tf.square(tf.concat(self.g_pred, 0)))
         
         self.loss_trajectories = self.MSEtrajectories + 0*self.MSEg
         self.loss = self.MSEu + 0.1*self.MSEf + 0.5*self.MSEtrajectories + 0.1*self.MSEg
@@ -192,7 +190,7 @@ class NeuralNetwork():
             List of matrices corresponding to the initial biases in each layer. 
             The default is [].
         act : string, optional
-            Activation function. Can be anh or relu. The default is "tanh".
+            Activation function. Can be tanh or relu. The default is "tanh".
 
         Returns
         -------
