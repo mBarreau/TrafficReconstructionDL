@@ -36,7 +36,7 @@ Ltotal = L + Lplus
 Ncar = rhoBar*rhoMax*Ltotal/1000 # Number of cars
 Npv = int(Ncar*p) # Number of PV
 
-for i in range(20):
+for i in range(1):
     print("******** SIMULATION %.0f ********" % (i+1))
 
     plt.close('all')
@@ -67,9 +67,9 @@ for i in range(20):
     #     w = csv.writer(file)
     #     w.writerow([L2_error])
 
-    with open('computation_time_L4DC.csv', 'a', newline='', encoding='utf-8') as file:
-        w = csv.writer(file)
-        w.writerow([computation_time])
+    # with open('computation_time_L4DC.csv', 'a', newline='', encoding='utf-8') as file:
+    #     w = csv.writer(file)
+    #     w.writerow([computation_time])
 
 
 simu_godunov.pv.plot()
