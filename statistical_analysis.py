@@ -1,6 +1,8 @@
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
 
 def get_data(filename):
     error = []
@@ -23,19 +25,21 @@ print('\nComputation time BFGS:')
 time2 = get_data('computation_time_BFGS.csv')
 
 figError = plt.figure()
-data = [error1, error2]
+plt.grid('on')
+data = pd.DataFrame(np.array([error1, error2]).T, columns=["Modified Training", "Naive BFGS"])
+sns.boxplot(data=data)
 plt.ylabel('Normalized L2-error')
-plt.boxplot(data)
-plt.xticks([1, 2], ['L4DC', 'BFGS'])
+plt.tight_layout()
 
 figTime = plt.figure()
-data = [time1, time2]
-plt.boxplot(data)
+plt.grid('on')
+data = pd.DataFrame(np.array([time1, time2]).T, columns=["Modified Training", "Naive BFGS"])
+sns.boxplot(data=data)
 plt.ylabel('Computation time [s]')
-plt.xticks([1, 2], ['L4DC', 'BFGS'])
+plt.tight_layout()
 
-figError.savefig('boxplot.eps', bbox_inches='tight')
-figTime.savefig('computation_time.eps', bbox_inches='tight')
+figError.savefig('boxplot_error.eps', bbox_inches='tight')
+figTime.savefig('boxplot_time.eps', bbox_inches='tight')
 
 plt.show()
 
