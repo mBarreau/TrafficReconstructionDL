@@ -16,13 +16,13 @@ def get_data(filename):
     return error
 
 print('\nL2 error L4DC:')
-error1 = get_data('error_L4DC.csv')
+error1 = get_data('example/error_L4DC.csv')
 print('\nL2 error BFGS:')
-error2 = get_data('error_BFGS.csv')
+error2 = get_data('example/error_BFGS.csv')
 print('\nComputation time L4DC:')
-time1 = get_data('computation_time_L4DC.csv')
+time1 = get_data('example/computation_time_L4DC.csv')
 print('\nComputation time BFGS:')
-time2 = get_data('computation_time_BFGS.csv')
+time2 = get_data('example/computation_time_BFGS.csv')
 
 figError = plt.figure()
 plt.grid('on')
@@ -38,8 +38,8 @@ sns.boxplot(data=data)
 plt.ylabel('Computation time [s]')
 plt.tight_layout()
 
-figError.savefig('boxplot_error.eps', bbox_inches='tight')
-figTime.savefig('boxplot_time.eps', bbox_inches='tight')
+figError.savefig('example/boxplot_error.eps', bbox_inches='tight')
+figTime.savefig('example/boxplot_time.eps', bbox_inches='tight')
 
 plt.show()
 
